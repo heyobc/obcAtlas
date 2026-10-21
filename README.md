@@ -1,49 +1,26 @@
 # obcAtlas
 
-An interactive world atlas built for exploring geography.
-
-obcAtlas started as a personal project to make looking up places easier while playing geography games like Worldle. Instead of switching between different maps and websites, the idea was to have a simple, detailed map with everything in one place.
+A personal interactive world atlas for exploring countries, cities, islands and geography while playing games such as Worldle.
 
 ## Features
 
-- Interactive world map with countries, cities, roads, and islands
-- Light and dark map themes
-- Location search
-- Turkish and English language options
-- Province boundaries and license plate codes for all 81 provinces of Türkiye
-- Zoom and navigation controls
+- Global interactive maps with light and navy dark modes
+- Search results for places sharing a name
+- Country flags and country information cards (capital, population, area, region)
+- Capital markers and highlighted political boundaries
+- Türkiye province borders and license-plate labels (toggleable)
+- Turkish and English interface
+- **irocero**, an animated explorer cat with geography facts, feeding, petting, sleeping, three visual styles, three coat colors, and locally saved settings
+- Desktop and mobile web support
 
-## Built With
+## Open
 
-- HTML, CSS, JavaScript
-- MapLibre GL JS
-- OpenStreetMap-based map data
-- OpenFreeMap
+[Open obcAtlas](https://heyobc.github.io/obcAtlas/)
 
-## Getting Started
+For local development, run `python -m http.server 8000` in the project directory and visit `http://localhost:8000`. Internet access is required for map tiles, place search and geographic data.
 
-You can use obcAtlas directly in your browser:
+## Technology and data
 
-**[Open obcAtlas](https://heyobc.github.io/obcAtlas/)**
+HTML, CSS, JavaScript, MapLibre GL JS, OpenFreeMap, OpenStreetMap/Nominatim, REST Countries and FlagCDN. Geography is provided by independent public data sources. Place names, country status and administrative boundaries may differ among sources. Country markers are approximate reference points rather than full political boundary polygons.
 
-To run it locally, clone the repository and start a local web server:
-
-```bash
-git clone https://github.com/heyobc/obcAtlas.git
-cd obcAtlas
-python -m http.server 8000
-```
-
-Then open `http://localhost:8000` in your browser.
-
-An internet connection is required to load map data.
-
-## Project Status
-
-obcAtlas is still in development. More geographic details, map customization options, and improvements to the mobile experience are planned.
-
-## Credits
-
-Map data © OpenStreetMap contributors.
-
-Built using MapLibre GL JS and OpenFreeMap.
+Map © OpenStreetMap contributors.

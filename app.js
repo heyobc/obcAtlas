@@ -259,7 +259,7 @@ function updatePlateMarkers(){
 
 els.closeInfo.addEventListener('click',()=>{els.info.hidden=true});
 els.turkeyButton.addEventListener('click',()=>map.flyTo({center:[35.0,39.1],zoom:5.45,duration:1500}));
-els.languageButton.addEventListener('click',()=>{lang=lang==='tr'?'en':'tr';updateUI();applyMapLanguage();updatePlateMarkers();});
+els.languageButton.addEventListener('click',()=>{lang=lang==='tr'?'en':'tr';updateUI();applyMapLanguage();updatePlateMarkers();refreshGeographyMarkers();});
 els.themeButton.addEventListener('click',()=>{theme=theme==='light'?'dark':'light';document.body.classList.toggle('dark',theme==='dark');map.setStyle(STYLES[theme]);updateUI();});
 els.platesButton.addEventListener('click',()=>{
   showPlates=!showPlates;
@@ -306,34 +306,80 @@ async function fetchProvinces(){
   }
 }
 
+const resultPanel=document.getElementById('searchResults');
+const flagsBtn=document.getElementById('flagsButton'), capitalsBtn=document.getElementById('capitalButton');
+let countries=[],flagMarkers=[],capitalMarkers=[],showFlags=false,showCapitals=true;
+const flagIcon=code=>code?.replace(/./g,ch=>String.fromCodePoint(127397+ch.charCodeAt(0)))||'⚑';
+const countryCode=c=>c.cca2?.toLowerCase();
+const cleanName=c=>c.translations?.[lang==='tr'?'tur':'eng']?.common||c.name?.common||c.cca2;
+function countryFact(c){const capital=c.capital?.[0]||'—';return lang==='tr'?`${cleanName(c)} için başkent ${capital}. ${c.region||''} bölgesinde yer alır.`:`The capital of ${cleanName(c)} is ${capital}. Region: ${c.region||'—'}.`;}
+function findCountry(place){const a=place.address||{};const code=a.country_code?.toUpperCase();if(code)return countries.find(c=>c.cca2===code);return null;}
+function showCountry(c,coord){const place=coord||{lat:c.latlng?.[0]||0,lng:c.latlng?.[1]||0};showInfo(`${flagIcon(c.cca2)} ${cleanName(c)}`,countryFact(c),place,lang==='tr'?'ÜLKE':'COUNTRY');const image=document.createElement('div');image.className='country-card';const flag=document.createElement('img');flag.src=`https://flagcdn.com/w160/${countryCode(c)}.png`;flag.alt=cleanName(c);flag.loading='lazy';const name=document.createElement('strong');name.textContent=cleanName(c);image.append(flag,name);const stats=document.createElement('div');stats.className='country-stats';const rows=[[lang==='tr'?'Başkent':'Capital',c.capital?.join(', ')||'—'],[lang==='tr'?'Bölge':'Region',c.region||'—'],[lang==='tr'?'Nüfus':'Population',(c.population||0).toLocaleString(lang==='tr'?'tr-TR':'en-US')],[lang==='tr'?'Yüzölçümü':'Area',`${(c.area||0).toLocaleString()} km²`]];for(const [label,value] of rows){const cell=document.createElement('div');const b=document.createElement('b');b.textContent=label;cell.append(b,document.createTextNode(value));stats.append(cell)}els.infoDescription.replaceChildren(image,stats);sayCat(countryFact(c),'explore');}
+function refreshGeographyMarkers(){for(const m of [...flagMarkers,...capitalMarkers])m.remove();flagMarkers=[];capitalMarkers=[];if(!countries.length)return;for(const c of countries){if(showFlags&&c.latlng?.length===2&&c.cca2?.length===2){const el=document.createElement('button');el.type='button';el.className='map-flag';el.title=cleanName(c);const img=document.createElement('img');img.src=`https://flagcdn.com/w40/${countryCode(c)}.png`;img.alt=cleanName(c);img.loading='lazy';el.append(img);el.addEventListener('click',ev=>{ev.stopPropagation();showCountry(c)});flagMarkers.push(new maplibregl.Marker({element:el}).setLngLat([c.latlng[1],c.latlng[0]]).addTo(map));}if(showCapitals&&c.capitalInfo?.latlng?.length===2){const loc=c.capitalInfo.latlng;const el=document.createElement('button');el.type='button';el.className='capital-marker';el.title=`★ ${c.capital?.[0]||''} — ${cleanName(c)}`;el.addEventListener('click',ev=>{ev.stopPropagation();showCountry(c,{lat:loc[0],lng:loc[1]})});capitalMarkers.push(new maplibregl.Marker({element:el}).setLngLat([loc[1],loc[0]]).addTo(map));}}}
+flagsBtn.addEventListener('click',()=>{showFlags=!showFlags;flagsBtn.classList.toggle('active',showFlags);flagsBtn.setAttribute('aria-pressed',String(showFlags));refreshGeographyMarkers()});
+capitalsBtn.addEventListener('click',()=>{showCapitals=!showCapitals;capitalsBtn.classList.toggle('active',showCapitals);capitalsBtn.setAttribute('aria-pressed',String(showCapitals));refreshGeographyMarkers()});
+async function fetchCountries(){try{const r=await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,flags,capital,latlng,capitalInfo,region,population,area,translations');if(!r.ok)throw Error('countries '+r.status);countries=await r.json();refreshGeographyMarkers()}catch(e){console.warn('Country details unavailable',e);setStatus(lang==='tr'?'Ülke bilgileri şu anda yüklenemedi.':'Country details are unavailable.')}}
+const catPanel=document.getElementById('catPanel'),catBubble=document.getElementById('catBubble'),catState=document.getElementById('catState'),catEffect=document.getElementById('catEffect');
+const catEls={happiness:document.getElementById('happiness'),fullness:document.getElementById('fullness'),style:document.getElementById('catStyle'),color:document.getElementById('catColor'),motion:document.getElementById('catMotion'),facts:document.getElementById('catFacts')};
+const defaults={style:'cartoon',color:'orange',motion:true,facts:true,happiness:75,fullness:70,hidden:false};let catPrefs;try{catPrefs={...defaults,...JSON.parse(localStorage.getItem('irocero'))}}catch{catPrefs={...defaults}}
+let catActionTimer=null;function saveCat(){try{localStorage.setItem('irocero',JSON.stringify(catPrefs))}catch{}}
+function updateCat(){catPanel.classList.toggle('pixel',catPrefs.style==='pixel');catPanel.classList.toggle('minimal',catPrefs.style==='minimal');catPanel.classList.toggle('black',catPrefs.color==='black');catPanel.classList.toggle('white',catPrefs.color==='white');catPanel.classList.toggle('no-motion',!catPrefs.motion);catPanel.hidden=catPrefs.hidden;document.getElementById('restoreCat').hidden=!catPrefs.hidden;catEls.happiness.value=catPrefs.happiness;catEls.fullness.value=catPrefs.fullness;catEls.style.value=catPrefs.style;catEls.color.value=catPrefs.color;catEls.motion.checked=catPrefs.motion;catEls.facts.checked=catPrefs.facts;saveCat();}
+function sayCat(message,action='idle'){if(action==='explore'&&!catPrefs.facts)return;catBubble.textContent=message;catPanel.classList.remove('sleeping','eating','happy','explore');catPanel.classList.add(({feed:'eating',pet:'happy',sleep:'sleeping',explore:'explore'})[action]||'idle');catEffect.textContent=({feed:'🐟',pet:'♥',sleep:'Zzz',explore:'🔎'})[action]||'';catState.textContent=action==='sleep'?'◌':'●';if(catActionTimer)clearTimeout(catActionTimer);if(action!=='sleep')catActionTimer=setTimeout(()=>{catPanel.classList.remove('eating','happy','explore');catEffect.textContent=''},3200)}
+document.getElementById('feedButton').onclick=()=>{catPrefs.fullness=Math.min(100,catPrefs.fullness+20);sayCat(lang==='tr'?'Miyav! Çok lezzetliydi!':'Meow! Delicious!','feed');updateCat()};
+function petCat(){catPrefs.happiness=Math.min(100,catPrefs.happiness+15);sayCat(lang==='tr'?'Prrrr... teşekkürler!':'Prrrr... thank you!','pet');updateCat()}
+document.getElementById('petButton').onclick=petCat;document.getElementById('catAvatar').onclick=petCat;
+document.getElementById('napButton').onclick=()=>sayCat(lang==='tr'?'Biraz uyuyorum...':'Taking a little nap...','sleep');
+document.getElementById('catSettingsButton').onclick=()=>{const s=document.getElementById('catSettings');s.hidden=!s.hidden};
+for(const [key,el] of [['style',catEls.style],['color',catEls.color],['motion',catEls.motion],['facts',catEls.facts]])el.addEventListener('change',()=>{catPrefs[key]=el.type==='checkbox'?el.checked:el.value;updateCat()});
+document.getElementById('hideCat').onclick=()=>{catPrefs.hidden=true;updateCat()};document.getElementById('restoreCat').onclick=()=>{catPrefs.hidden=false;updateCat()};
+updateCat();fetchCountries();
+function closeSearchResults(){resultPanel.hidden=true;resultPanel.replaceChildren();}
+function focusPlace(place){
+  const lon=Number(place.lon),lat=Number(place.lat);
+  if(place.boundingbox){
+    const b=place.boundingbox.map(Number);
+    map.fitBounds([[b[2],b[0]],[b[3],b[1]]],{padding:90,maxZoom:12,duration:1300});
+  }else map.flyTo({center:[lon,lat],zoom:9});
+  const match=findCountry(place);if(match&&(place.addresstype==='country'||place.type==='administrative'&&place.addresstype==='country'||place.class==='boundary'&&place.type==='administrative'&&place.address?.country===place.name))showCountry(match,{lat,lng:lon});else{showInfo(place.name||place.display_name.split(',')[0],place.display_name,{lat,lng:lon},t('location'));if(match)sayCat(countryFact(match),'explore');}
+  closeSearchResults();setStatus('');
+}
+function renderSearchResults(places){
+  resultPanel.replaceChildren();
+  const heading=document.createElement('div');
+  heading.className='search-results-heading';
+  heading.textContent=lang==='tr'?`${places.length} konum bulundu — birini seç`:`${places.length} places found — choose one`;
+  resultPanel.append(heading);
+  for(const place of places){
+    const button=document.createElement('button');
+    button.type='button';button.className='search-result';
+    const title=document.createElement('strong');
+    title.textContent=place.name||place.display_name.split(',')[0];
+    const address=document.createElement('small');
+    address.textContent=place.display_name;
+    button.append(title,address);
+    button.addEventListener('click',()=>focusPlace(place));
+    resultPanel.append(button);
+  }
+  resultPanel.hidden=false;
+}
 async function searchPlace(query){
-  setStatus(t('searching'));
-  els.searchButton.disabled=true;
+  closeSearchResults();setStatus(t('searching'));els.searchButton.disabled=true;
   try{
-    const endpoint=`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=${lang}&q=${encodeURIComponent(query)}`;
+    const endpoint=`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&addressdetails=1&dedupe=1&accept-language=${lang}&q=${encodeURIComponent(query)}`;
     const response=await fetch(endpoint);
-    if(!response.ok) throw Error('Search '+response.status);
+    if(!response.ok)throw Error('Search '+response.status);
     const places=await response.json();
-    if(!places.length){
-      setStatus(t('noresult'));
-      return;
-    }
-    const place=places[0], lon=Number(place.lon), lat=Number(place.lat);
-    if(place.boundingbox){
-      const b=place.boundingbox.map(Number);
-      map.fitBounds([[b[2],b[0]],[b[3],b[1]]],{padding:90,maxZoom:12,duration:1300});
-    } else {
-      map.flyTo({center:[lon,lat],zoom:9});
-    }
-    showInfo(place.display_name.split(',')[0],place.display_name,{lat,lng:lon},t('location'));
+    if(!places.length){setStatus(t('noresult'));return;}
+    renderSearchResults(places);
     setStatus('');
   }catch(err){
     console.warn(err);
     setStatus(lang==='tr'?'Arama şu anda kullanılamıyor.':'Search is currently unavailable.');
-  }finally{
-    els.searchButton.disabled=false;
-  }
+  }finally{els.searchButton.disabled=false;}
 }
+resultPanel.addEventListener('keydown',e=>{if(e.key==='Escape')closeSearchResults();});
+window.addEventListener('keydown',e=>{if(e.key==='Escape')closeSearchResults();});
+document.addEventListener('pointerdown',e=>{if(!els.searchForm.contains(e.target))closeSearchResults();});
 
 els.searchForm.addEventListener('submit',event=>{
   event.preventDefault();
