@@ -1,26 +1,49 @@
-# obcAtlas — Kişisel Dünya Atlası
+# obcAtlas
 
-Dünya atlası; ülkeler, şehirler, yollar, adalar, başkentler, tema seçimi, dil değiştirme ve Türkiye'nin 81 ili için plaka kodu katmanı.
+An interactive world atlas built for exploring geography.
 
-## Windows'ta açmak / arkadaşınla paylaşmak
+obcAtlas started as a personal project to make looking up places easier while playing geography games like Worldle. Instead of switching between different maps and websites, the idea was to have a simple, detailed map with everything in one place.
 
-1. `obcAtlas.zip` dosyasını gönder. Karşı taraf ZIP'i klasöre çıkartsın.
-2. Bilgisayarda **Python 3** yüklü olmalı: https://www.python.org/downloads/ . Kurulumda **Add Python to PATH** seçilsin.
-3. Klasörde **BASLAT.bat** dosyasına çift tıklasın. Windows güvenlik uyarısı gösterirse yalnızca dosyanın kaynağına güveniyorsa çalıştırsın.
-4. Terminal penceresi açıkken tarayıcı otomatik açılır; açılmazsa terminaldeki yerel adresi ziyaret etsin.
-5. Bitirince terminali kapatabilir veya Ctrl+C kullanabilir.
+## Features
 
-Windows'ta `BASLAT.bat` çalışmazsa klasörde komut satırı açıp `py -m http.server 8000` komutuyla, ardından `http://localhost:8000` adresiyle de açılabilir. Port 8000 kullanımda ise `py -m http.server 8001` ve `http://localhost:8001` kullanılabilir.
+- Interactive world map with countries, cities, roads, and islands
+- Light and dark map themes
+- Location search
+- Turkish and English language options
+- Province boundaries and license plate codes for all 81 provinces of Türkiye
+- Zoom and navigation controls
 
-## Gereksinimler
-- Windows ve Python 3 (hazır başlatıcı için). Diğer işletim sistemlerinde `python3 -m http.server 8000` kullanılabilir.
-- Aktif internet bağlantısı gerekir: harita karoları, MapLibre, Türkiye sınır verisi ve arama çevrimiçi yüklenir.
-- Harita şu an bağımsız bir .exe değildir; paylaşılabilir web projesidir. İki bilgisayarda ayrı ayrı çalıştırılabilir. İnternete yayımlanması için statik hosting kullanılabilir.
+## Built With
 
-## Veri ve sınırlamalar
-- MapLibre ve OpenFreeMap: https://maplibre.org/maplibre-gl-js/docs/ ; https://openfreemap.org/
-- Türkiye sınır ve plaka verisi: https://github.com/theaiagent/turkiye_iller_geojson
-- Arama Nominatim: https://nominatim.org/release-docs/latest/api/Search/ (kullanım limitlerine dikkat edin)
-- Bazı yer adları seçilen dile çevrilemeyebilir. Küçük adalar ve yollar veri sağlayıcısının kapsamasına bağlıdır.
-- Başkent renk farkı altyapı stilinde ayrı bir başkent katmanı bulunmasına bağlıdır.
-- Kullanılan harita ve veri kaynaklarının lisans/atıf şartlarına uyulmalıdır.
+- HTML, CSS, JavaScript
+- MapLibre GL JS
+- OpenStreetMap-based map data
+- OpenFreeMap
+
+## Getting Started
+
+You can use obcAtlas directly in your browser:
+
+**[Open obcAtlas](https://heyobc.github.io/obcAtlas/)**
+
+To run it locally, clone the repository and start a local web server:
+
+```bash
+git clone https://github.com/heyobc/obcAtlas.git
+cd obcAtlas
+python -m http.server 8000
+```
+
+Then open `http://localhost:8000` in your browser.
+
+An internet connection is required to load map data.
+
+## Project Status
+
+obcAtlas is still in development. More geographic details, map customization options, and improvements to the mobile experience are planned.
+
+## Credits
+
+Map data © OpenStreetMap contributors.
+
+Built using MapLibre GL JS and OpenFreeMap.
