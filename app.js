@@ -259,7 +259,7 @@ function updatePlateMarkers(){
 
 els.closeInfo.addEventListener('click',()=>{els.info.hidden=true});
 els.turkeyButton.addEventListener('click',()=>map.flyTo({center:[35.0,39.1],zoom:5.45,duration:1500}));
-els.languageButton.addEventListener('click',()=>{lang=lang==='tr'?'en':'tr';updateUI();applyMapLanguage();updatePlateMarkers();refreshGeographyMarkers();});
+els.languageButton.addEventListener('click',()=>{lang=lang==='tr'?'en':'tr';updateUI();syncGeographyControls();applyMapLanguage();updatePlateMarkers();refreshGeographyMarkers();});
 els.themeButton.addEventListener('click',()=>{theme=theme==='light'?'dark':'light';document.body.classList.toggle('dark',theme==='dark');map.setStyle(STYLES[theme]);updateUI();});
 els.platesButton.addEventListener('click',()=>{
   showPlates=!showPlates;
@@ -272,6 +272,7 @@ els.platesButton.addEventListener('click',()=>{
 map.on('style.load',()=>{
   applyMapLanguage();
   enhanceBaseMapStyle();
+  syncNativeCapitalLayers();
   ensureProvinceLayers();
   updatePlateMarkers();
 });
@@ -308,31 +309,90 @@ async function fetchProvinces(){
 
 const resultPanel=document.getElementById('searchResults');
 const flagsBtn=document.getElementById('flagsButton'), capitalsBtn=document.getElementById('capitalButton');
-let countries=[],flagMarkers=[],capitalMarkers=[],showFlags=false,showCapitals=true;
+let countries=[],flagMarkers=[],capitalMarkers=[],showFlags=true,showCapitals=true;
+function syncGeographyControls(){for(const [el,on] of [[flagsBtn,showFlags],[capitalsBtn,showCapitals]]){el.classList.toggle('active',on);el.setAttribute('aria-pressed',String(on));}document.getElementById('flagsText').textContent=lang==='tr'?`Bayraklar: ${showFlags?'Açık':'Kapalı'}`:`Flags: ${showFlags?'On':'Off'}`;document.getElementById('capitalText').textContent=lang==='tr'?`Başkentler: ${showCapitals?'Açık':'Kapalı'}`:`Capitals: ${showCapitals?'On':'Off'}`;}
+function syncNativeCapitalLayers(){const style=map.getStyle();if(!style?.layers)return;for(const layer of style.layers){if(layer.type!=='symbol'||!/capital/i.test(layer.id))continue;try{map.setLayoutProperty(layer.id,'visibility',showCapitals?'visible':'none')}catch(e){console.warn('Capital visibility',e)}}}
+
 const flagIcon=code=>code?.replace(/./g,ch=>String.fromCodePoint(127397+ch.charCodeAt(0)))||'⚑';
 const countryCode=c=>c.cca2?.toLowerCase();
 const cleanName=c=>c.translations?.[lang==='tr'?'tur':'eng']?.common||c.name?.common||c.cca2;
 function countryFact(c){const capital=c.capital?.[0]||'—';return lang==='tr'?`${cleanName(c)} için başkent ${capital}. ${c.region||''} bölgesinde yer alır.`:`The capital of ${cleanName(c)} is ${capital}. Region: ${c.region||'—'}.`;}
 function findCountry(place){const a=place.address||{};const code=a.country_code?.toUpperCase();if(code)return countries.find(c=>c.cca2===code);return null;}
-function showCountry(c,coord){const place=coord||{lat:c.latlng?.[0]||0,lng:c.latlng?.[1]||0};showInfo(`${flagIcon(c.cca2)} ${cleanName(c)}`,countryFact(c),place,lang==='tr'?'ÜLKE':'COUNTRY');const image=document.createElement('div');image.className='country-card';const flag=document.createElement('img');flag.src=`https://flagcdn.com/w160/${countryCode(c)}.png`;flag.alt=cleanName(c);flag.loading='lazy';const name=document.createElement('strong');name.textContent=cleanName(c);image.append(flag,name);const stats=document.createElement('div');stats.className='country-stats';const rows=[[lang==='tr'?'Başkent':'Capital',c.capital?.join(', ')||'—'],[lang==='tr'?'Bölge':'Region',c.region||'—'],[lang==='tr'?'Nüfus':'Population',(c.population||0).toLocaleString(lang==='tr'?'tr-TR':'en-US')],[lang==='tr'?'Yüzölçümü':'Area',`${(c.area||0).toLocaleString()} km²`]];for(const [label,value] of rows){const cell=document.createElement('div');const b=document.createElement('b');b.textContent=label;cell.append(b,document.createTextNode(value));stats.append(cell)}els.infoDescription.replaceChildren(image,stats);sayCat(countryFact(c),'explore');}
-function refreshGeographyMarkers(){for(const m of [...flagMarkers,...capitalMarkers])m.remove();flagMarkers=[];capitalMarkers=[];if(!countries.length)return;for(const c of countries){if(showFlags&&c.latlng?.length===2&&c.cca2?.length===2){const el=document.createElement('button');el.type='button';el.className='map-flag';el.title=cleanName(c);const img=document.createElement('img');img.src=`https://flagcdn.com/w40/${countryCode(c)}.png`;img.alt=cleanName(c);img.loading='lazy';el.append(img);el.addEventListener('click',ev=>{ev.stopPropagation();showCountry(c)});flagMarkers.push(new maplibregl.Marker({element:el}).setLngLat([c.latlng[1],c.latlng[0]]).addTo(map));}if(showCapitals&&c.capitalInfo?.latlng?.length===2){const loc=c.capitalInfo.latlng;const el=document.createElement('button');el.type='button';el.className='capital-marker';el.title=`★ ${c.capital?.[0]||''} — ${cleanName(c)}`;el.addEventListener('click',ev=>{ev.stopPropagation();showCountry(c,{lat:loc[0],lng:loc[1]})});capitalMarkers.push(new maplibregl.Marker({element:el}).setLngLat([loc[1],loc[0]]).addTo(map));}}}
-flagsBtn.addEventListener('click',()=>{showFlags=!showFlags;flagsBtn.classList.toggle('active',showFlags);flagsBtn.setAttribute('aria-pressed',String(showFlags));refreshGeographyMarkers()});
-capitalsBtn.addEventListener('click',()=>{showCapitals=!showCapitals;capitalsBtn.classList.toggle('active',showCapitals);capitalsBtn.setAttribute('aria-pressed',String(showCapitals));refreshGeographyMarkers()});
-async function fetchCountries(){try{const r=await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,flags,capital,latlng,capitalInfo,region,population,area,translations');if(!r.ok)throw Error('countries '+r.status);countries=await r.json();refreshGeographyMarkers()}catch(e){console.warn('Country details unavailable',e);setStatus(lang==='tr'?'Ülke bilgileri şu anda yüklenemedi.':'Country details are unavailable.')}}
+function showCountry(c,coord){const place=coord||{lat:c.latlng?.[0]||0,lng:c.latlng?.[1]||0};showInfo(`${flagIcon(c.cca2)} ${cleanName(c)}`,countryFact(c),place,lang==='tr'?'ÜLKE':'COUNTRY');const image=document.createElement('div');image.className='country-card';const flag=document.createElement('img');flag.src=`https://flagcdn.com/w160/${countryCode(c)}.png`;flag.alt=cleanName(c);flag.loading='lazy';flag.onerror=()=>{flag.replaceWith(document.createTextNode(flagIcon(c.cca2)+' '));};const name=document.createElement('strong');name.textContent=cleanName(c);image.append(flag,name);const stats=document.createElement('div');stats.className='country-stats';const rows=[[lang==='tr'?'Başkent':'Capital',c.capital?.join(', ')||'—'],[lang==='tr'?'Bölge':'Region',c.region||'—'],[lang==='tr'?'Nüfus':'Population',(c.population||0).toLocaleString(lang==='tr'?'tr-TR':'en-US')],[lang==='tr'?'Yüzölçümü':'Area',`${(c.area||0).toLocaleString()} km²`]];for(const [label,value] of rows){const cell=document.createElement('div');const b=document.createElement('b');b.textContent=label;cell.append(b,document.createTextNode(value));stats.append(cell)}els.infoDescription.replaceChildren(image,stats);sayCat(countryFact(c),'explore');}
+function refreshGeographyMarkers(){for(const m of [...flagMarkers,...capitalMarkers])m.remove();flagMarkers=[];capitalMarkers=[];if(!countries.length)return;for(const c of countries){if(showFlags&&c.latlng?.length===2&&c.cca2?.length===2){const el=document.createElement('button');el.type='button';el.className='map-flag';el.title=cleanName(c);const img=document.createElement('img');img.src=`https://flagcdn.com/w40/${countryCode(c)}.png`;img.alt=cleanName(c);img.loading='lazy';img.onerror=()=>{img.remove();el.textContent=flagIcon(c.cca2);};el.append(img);el.addEventListener('click',ev=>{ev.stopPropagation();showCountry(c)});flagMarkers.push(new maplibregl.Marker({element:el}).setLngLat([c.latlng[1],c.latlng[0]]).addTo(map));}if(showCapitals&&c.capitalInfo?.latlng?.length===2){const loc=c.capitalInfo.latlng;const el=document.createElement('button');el.type='button';el.className='capital-marker';el.textContent='★';el.setAttribute('aria-label',`Capital: ${c.capital?.[0]||''}`);el.title=`★ ${c.capital?.[0]||''} — ${cleanName(c)}`;el.addEventListener('click',ev=>{ev.stopPropagation();showCountry(c,{lat:loc[0],lng:loc[1]})});capitalMarkers.push(new maplibregl.Marker({element:el}).setLngLat([loc[1],loc[0]]).addTo(map));}}}
+flagsBtn.addEventListener('click',()=>{showFlags=!showFlags;syncGeographyControls();refreshGeographyMarkers()});
+capitalsBtn.addEventListener('click',()=>{showCapitals=!showCapitals;syncGeographyControls();syncNativeCapitalLayers();refreshGeographyMarkers()});
+async function fetchCountries(){
+  const sources=[
+    'https://restcountries.com/v3.1/all?fields=name,cca2,flags,capital,latlng,capitalInfo,region,population,area,translations',
+    'https://raw.githubusercontent.com/mledoze/countries/master/countries.json'
+  ];
+  for(const url of sources){
+    try{
+      const r=await fetch(url,{cache:'no-cache'});
+      if(!r.ok)throw Error('HTTP '+r.status);
+      const data=await r.json();
+      if(!Array.isArray(data)||data.length<150)throw Error('Countries data invalid');
+      countries=data.filter(c=>c.cca2&&Array.isArray(c.latlng));
+      refreshGeographyMarkers();
+      setStatus('');
+      return;
+    }catch(e){console.warn('Country source error',url,e)}
+  }
+  setStatus(lang==='tr'?'Bayraklar için ülke verileri yüklenemedi. Bağlantıyı kontrol et.':'Country data for flags could not be loaded. Check connection.');
+}
 const catPanel=document.getElementById('catPanel'),catBubble=document.getElementById('catBubble'),catState=document.getElementById('catState'),catEffect=document.getElementById('catEffect');
-const catEls={happiness:document.getElementById('happiness'),fullness:document.getElementById('fullness'),style:document.getElementById('catStyle'),color:document.getElementById('catColor'),motion:document.getElementById('catMotion'),facts:document.getElementById('catFacts')};
-const defaults={style:'cartoon',color:'orange',motion:true,facts:true,happiness:75,fullness:70,hidden:false};let catPrefs;try{catPrefs={...defaults,...JSON.parse(localStorage.getItem('irocero'))}}catch{catPrefs={...defaults}}
+const catEls={happiness:document.getElementById('happiness'),fullness:document.getElementById('fullness'),style:document.getElementById('catStyle'),color:document.getElementById('catColor'),eye:document.getElementById('catEye'),motion:document.getElementById('catMotion'),facts:document.getElementById('catFacts')};
+const defaults={style:'cartoon',color:'orange',eye:'amber',motion:true,facts:true,happiness:75,fullness:70,hidden:false,position:null};let catPrefs;try{catPrefs={...defaults,...JSON.parse(localStorage.getItem('irocero'))}}catch{catPrefs={...defaults}}
 let catActionTimer=null;function saveCat(){try{localStorage.setItem('irocero',JSON.stringify(catPrefs))}catch{}}
-function updateCat(){catPanel.classList.toggle('pixel',catPrefs.style==='pixel');catPanel.classList.toggle('minimal',catPrefs.style==='minimal');catPanel.classList.toggle('black',catPrefs.color==='black');catPanel.classList.toggle('white',catPrefs.color==='white');catPanel.classList.toggle('no-motion',!catPrefs.motion);catPanel.hidden=catPrefs.hidden;document.getElementById('restoreCat').hidden=!catPrefs.hidden;catEls.happiness.value=catPrefs.happiness;catEls.fullness.value=catPrefs.fullness;catEls.style.value=catPrefs.style;catEls.color.value=catPrefs.color;catEls.motion.checked=catPrefs.motion;catEls.facts.checked=catPrefs.facts;saveCat();}
+function updateCat(){catPanel.classList.toggle('pixel',catPrefs.style==='pixel');catPanel.classList.toggle('minimal',catPrefs.style==='minimal');catPanel.classList.toggle('black',catPrefs.color==='black');catPanel.classList.toggle('white',catPrefs.color==='white');catPanel.classList.toggle('no-motion',!catPrefs.motion);catPanel.hidden=catPrefs.hidden;document.getElementById('restoreCat').hidden=!catPrefs.hidden;catEls.happiness.value=catPrefs.happiness;catEls.fullness.value=catPrefs.fullness;catEls.style.value=catPrefs.style;catEls.color.value=catPrefs.color;catEls.eye.value=catPrefs.eye||'amber';catPanel.style.setProperty('--cat-eye',({amber:'#e5a742',green:'#66cf8e',blue:'#78bafa'})[catPrefs.eye]||'#e5a742');catEls.motion.checked=catPrefs.motion;catEls.facts.checked=catPrefs.facts;saveCat();}
 function sayCat(message,action='idle'){if(action==='explore'&&!catPrefs.facts)return;catBubble.textContent=message;catPanel.classList.remove('sleeping','eating','happy','explore');catPanel.classList.add(({feed:'eating',pet:'happy',sleep:'sleeping',explore:'explore'})[action]||'idle');catEffect.textContent=({feed:'🐟',pet:'♥',sleep:'Zzz',explore:'🔎'})[action]||'';catState.textContent=action==='sleep'?'◌':'●';if(catActionTimer)clearTimeout(catActionTimer);if(action!=='sleep')catActionTimer=setTimeout(()=>{catPanel.classList.remove('eating','happy','explore');catEffect.textContent=''},3200)}
 document.getElementById('feedButton').onclick=()=>{catPrefs.fullness=Math.min(100,catPrefs.fullness+20);sayCat(lang==='tr'?'Miyav! Çok lezzetliydi!':'Meow! Delicious!','feed');updateCat()};
 function petCat(){catPrefs.happiness=Math.min(100,catPrefs.happiness+15);sayCat(lang==='tr'?'Prrrr... teşekkürler!':'Prrrr... thank you!','pet');updateCat()}
 document.getElementById('petButton').onclick=petCat;document.getElementById('catAvatar').onclick=petCat;
 document.getElementById('napButton').onclick=()=>sayCat(lang==='tr'?'Biraz uyuyorum...':'Taking a little nap...','sleep');
 document.getElementById('catSettingsButton').onclick=()=>{const s=document.getElementById('catSettings');s.hidden=!s.hidden};
-for(const [key,el] of [['style',catEls.style],['color',catEls.color],['motion',catEls.motion],['facts',catEls.facts]])el.addEventListener('change',()=>{catPrefs[key]=el.type==='checkbox'?el.checked:el.value;updateCat()});
+for(const [key,el] of [['style',catEls.style],['color',catEls.color],['eye',catEls.eye],['motion',catEls.motion],['facts',catEls.facts]])el.addEventListener('change',()=>{catPrefs[key]=el.type==='checkbox'?el.checked:el.value;updateCat()});
 document.getElementById('hideCat').onclick=()=>{catPrefs.hidden=true;updateCat()};document.getElementById('restoreCat').onclick=()=>{catPrefs.hidden=false;updateCat()};
-updateCat();fetchCountries();
+// Drag irocero by its illustration (mouse or touch). A short tap still pets it.
+const catAvatar=document.getElementById('catAvatar');
+let draggingCat=null,ignoreNextPet=false;
+function placeCat(x,y){
+  const rect=catPanel.getBoundingClientRect();
+  const nx=Math.max(4,Math.min(window.innerWidth-rect.width-4,x));
+  const ny=Math.max(4,Math.min(window.innerHeight-rect.height-4,y));
+  catPanel.style.left=nx+'px';catPanel.style.top=ny+'px';
+  catPanel.style.right='auto';catPanel.style.bottom='auto';
+  return {x:nx,y:ny};
+}
+catAvatar.addEventListener('pointerdown',e=>{
+  if(e.button!==0)return;
+  const r=catPanel.getBoundingClientRect();
+  draggingCat={id:e.pointerId,startX:e.clientX,startY:e.clientY,x:r.left,y:r.top,moved:false};
+  catAvatar.setPointerCapture(e.pointerId);
+});
+catAvatar.addEventListener('pointermove',e=>{
+  if(!draggingCat||draggingCat.id!==e.pointerId)return;
+  const dx=e.clientX-draggingCat.startX,dy=e.clientY-draggingCat.startY;
+  if(Math.hypot(dx,dy)>7)draggingCat.moved=true;
+  if(draggingCat.moved){placeCat(draggingCat.x+dx,draggingCat.y+dy);e.preventDefault();}
+});
+function finishCatDrag(e){
+  if(!draggingCat||draggingCat.id!==e.pointerId)return;
+  if(draggingCat.moved){
+    const r=catPanel.getBoundingClientRect();
+    catPrefs.position={x:r.left,y:r.top};saveCat();
+    ignoreNextPet=true;
+  }
+  draggingCat=null;
+}
+catAvatar.addEventListener('pointerup',finishCatDrag);
+catAvatar.addEventListener('pointercancel',finishCatDrag);
+catAvatar.addEventListener('click',e=>{if(ignoreNextPet){e.stopImmediatePropagation();ignoreNextPet=false;}},true);
+window.addEventListener('resize',()=>{if(catPrefs.position){catPrefs.position=placeCat(catPrefs.position.x,catPrefs.position.y);saveCat();}});
+updateCat();
+if(catPrefs.position)catPrefs.position=placeCat(catPrefs.position.x,catPrefs.position.y);
+fetchCountries();
 function closeSearchResults(){resultPanel.hidden=true;resultPanel.replaceChildren();}
 function focusPlace(place){
   const lon=Number(place.lon),lat=Number(place.lat);
@@ -390,4 +450,5 @@ els.searchForm.addEventListener('submit',event=>{
 map.on('error',e=>{console.warn('Map:',e.error);});
 
 updateUI();
+syncGeographyControls();
 fetchProvinces();

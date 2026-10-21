@@ -24,3 +24,9 @@ For local development, run `python -m http.server 8000` in the project directory
 HTML, CSS, JavaScript, MapLibre GL JS, OpenFreeMap, OpenStreetMap/Nominatim, REST Countries and FlagCDN. Geography is provided by independent public data sources. Place names, country status and administrative boundaries may differ among sources. Country markers are approximate reference points rather than full political boundary polygons.
 
 Map © OpenStreetMap contributors.
+
+
+### v3.2 map controls
+- Capital markers use high-contrast golden stars in dark mode.
+- Flags and capitals toggles explicitly show their current on/off state.
+- Native capital labels are also hidden when capitals are turned off (for style layers identified as capitals).
