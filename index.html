@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>obcAtlas • Dünya Haritası</title>
+<link href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="map" aria-label="Etkileşimli dünya haritası"></div>
+<header class="toolbar">
+  <div class="brand"><span class="brand-icon">◎</span><span>obcAtlas <small id="subtitle">Dünya Rehberi</small></span></div>
+  <form id="searchForm" class="search" autocomplete="off"><input id="searchInput" type="search" placeholder="Ülke, şehir, ada veya yer ara…" aria-label="Konum ara"><button type="submit" id="searchButton">Ara ↗</button></form>
+  <div class="options"><button id="turkeyButton" title="Türkiye'ye git">Türkiye</button><button id="themeButton" aria-label="Temayı değiştir">☾ <span id="themeText">Koyu</span></button><button id="platesButton" aria-pressed="false">▦ <span id="platesText">Plakalar: Kapalı</span></button><button id="languageButton" title="Harita dilini değiştir">TR ▾</button></div>
+</header>
+<aside id="info" class="info" hidden><button id="closeInfo" class="close" aria-label="Kapat">×</button><div class="eyebrow" id="infoKind">KONUM</div><h2 id="infoTitle"></h2><p id="infoDescription"></p><div id="infoCoords" class="coords"></div></aside>
+<div class="bottom-left"><div class="hint" id="hint">Haritada bir yere tıkla veya arama yap</div><div class="status" id="status" role="status"></div></div>
+<div class="legend" id="legend" hidden>Türkiye • <strong>81 il / plaka kodları</strong><span>Yakınlaşınca etiketler görünür</span></div>
+<script type="module" src="app.js"></script>
+</body></html>
