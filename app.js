@@ -479,6 +479,40 @@ function feedLocalFood(name,emoji,c){
   window.__foodAnimationTimer=setTimeout(()=>floating.classList.remove('food-action'),3100);
   updateCat();
 }
+// World Bank WDI: total population (SP.POP.TOTL), latest nonempty annual observation.
+// The response includes the observation year. Requests are cached in this tab.
+const worldBankPopulationCache=new Map();
+async function worldBankPopulation(iso2){
+  const code=String(iso2||'').toUpperCase();
+  if(!/^[A-Z]{2}$/.test(code))return null;
+  if(!worldBankPopulationCache.has(code)){
+    const task=(async()=>{
+      const url=`https://api.worldbank.org/v2/country/${code}/indicator/SP.POP.TOTL?format=json&mrnev=1&per_page=10`;
+      const res=await fetch(url);
+      if(!res.ok)throw new Error(`World Bank HTTP ${res.status}`);
+      const data=await res.json();
+      const row=Array.isArray(data?.[1])?data[1].find(x=>Number.isFinite(Number(x.value))&&Number(x.value)>0):null;
+      return row?{value:Number(row.value),year:String(row.date),source:'World Bank'}:null;
+    })().catch(error=>{console.warn('Population lookup:',code,error);return null});
+    worldBankPopulationCache.set(code,task);
+  }
+  return worldBankPopulationCache.get(code);
+}
+function applyPopulationToElement(element,c){
+  if(!element)return;
+  const fallback=Number(c?.population);
+  element.textContent=Number.isFinite(fallback)&&fallback>0
+    ?fallback.toLocaleString(lang==='tr'?'tr-TR':'en-US')+' (kaynak: ülke verisi)'
+    :(lang==='tr'?'Nüfus yükleniyor…':'Loading population…');
+  worldBankPopulation(c?.cca2).then(result=>{
+    if(!element.isConnected)return;
+    if(result){
+      element.textContent=`${result.value.toLocaleString(lang==='tr'?'tr-TR':'en-US')} (${result.year} · World Bank)`;
+    }else if(!(fallback>0)){
+      element.textContent=lang==='tr'?'Nüfus verisi alınamadı':'Population unavailable';
+    }
+  });
+}
 function formatPopulation(c){
   const pop=Number(c?.population);
   return Number.isFinite(pop)&&pop>0?pop.toLocaleString(lang==='tr'?'tr-TR':'en-US'):(lang==='tr'?'Veri bulunamadı':'Data unavailable');
@@ -487,10 +521,15 @@ function addCountryPopulation(c){
   if(!c)return;
   const row=document.createElement('div');row.className='country-population-extra';
   const b=document.createElement('strong');b.textContent=lang==='tr'?'Ülke nüfusu':'Country population';
-  const val=document.createElement('span');val.textContent=formatPopulation(c);
+  const val=document.createElement('span');applyPopulationToElement(val,c);
   row.append(b,val);els.infoDescription.append(row);
 }
-function showCountry(c,coord){const place=coord||{lat:c.latlng?.[0]||0,lng:c.latlng?.[1]||0};showInfo(`${flagIcon(c.cca2)} ${cleanName(c)}`,countryFact(c),place,lang==='tr'?'ÜLKE':'COUNTRY');const image=document.createElement('div');image.className='country-card';const flag=document.createElement('img');flag.src=`https://flagcdn.com/w160/${countryCode(c)}.png`;flag.alt=cleanName(c);flag.loading='lazy';flag.onerror=()=>{flag.replaceWith(document.createTextNode(flagIcon(c.cca2)+' '));};const name=document.createElement('strong');name.textContent=cleanName(c);image.append(flag,name);const stats=document.createElement('div');stats.className='country-stats';const rows=[[lang==='tr'?'Başkent':'Capital',c.capital?.join(', ')||'—'],[lang==='tr'?'Bölge':'Region',c.region||'—'],[lang==='tr'?'Nüfus':'Population',formatPopulation(c)],[lang==='tr'?'Yüzölçümü':'Area',`${(c.area||0).toLocaleString()} km²`]];for(const [label,value] of rows){const cell=document.createElement('div');const b=document.createElement('b');b.textContent=label;cell.append(b,document.createTextNode(value));stats.append(cell)}els.infoDescription.replaceChildren(image,stats,addCountryFoods(c));addFactReplayButton(c);sayCat(countryFact(c),'explore');}
+function showCountry(c,coord){const place=coord||{lat:c.latlng?.[0]||0,lng:c.latlng?.[1]||0};showInfo(`${flagIcon(c.cca2)} ${cleanName(c)}`,countryFact(c),place,lang==='tr'?'ÜLKE':'COUNTRY');const image=document.createElement('div');image.className='country-card';const flag=document.createElement('img');flag.src=`https://flagcdn.com/w160/${countryCode(c)}.png`;flag.alt=cleanName(c);flag.loading='lazy';flag.onerror=()=>{flag.replaceWith(document.createTextNode(flagIcon(c.cca2)+' '));};const name=document.createElement('strong');name.textContent=cleanName(c);image.append(flag,name);const stats=document.createElement('div');stats.className='country-stats';const rows=[[lang==='tr'?'Başkent':'Capital',c.capital?.join(', ')||'—'],[lang==='tr'?'Bölge':'Region',c.region||'—'],[lang==='tr'?'Nüfus':'Population','__POPULATION_LOADING__'],[lang==='tr'?'Yüzölçümü':'Area',`${(c.area||0).toLocaleString()} km²`]];for(const [label,value] of rows){const cell=document.createElement('div');const b=document.createElement('b');b.textContent=label;cell.append(b,document.createTextNode(value));stats.append(cell);if(value==='__POPULATION_LOADING__'){
+    const valueNode=cell.lastChild;
+    const valueSpan=document.createElement('span');
+    valueNode.replaceWith(valueSpan);
+    applyPopulationToElement(valueSpan,c);
+  }}els.infoDescription.replaceChildren(image,stats,addCountryFoods(c));addFactReplayButton(c);sayCat(countryFact(c),'explore');}
 function capitalFeatures(){
   return countries.filter(c=>showCapitals && Array.isArray(c.capitalInfo?.latlng) && c.capitalInfo.latlng.length===2 && c.capital?.[0]).map(c=>({
     type:'Feature', geometry:{type:'Point',coordinates:[Number(c.capitalInfo.latlng[1]),Number(c.capitalInfo.latlng[0])]},
@@ -573,7 +612,6 @@ flagsBtn.addEventListener('click',()=>{showFlags=!showFlags;syncGeographyControl
 capitalsBtn.addEventListener('click',()=>{showCapitals=!showCapitals;syncGeographyControls();syncNativeCapitalLayers();refreshGeographyMarkers()});
 async function fetchCountries(){
   const sources=[
-    'https://restcountries.com/v3.1/all?fields=name,cca2,flags,capital,latlng,capitalInfo,region,population,area,translations',
     'https://raw.githubusercontent.com/mledoze/countries/master/countries.json'
   ];
   for(const url of sources){

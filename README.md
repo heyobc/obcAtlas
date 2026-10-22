@@ -85,3 +85,6 @@ Click a country on the map or select a place in search to hear an irocero geogra
 - Missing population values display an explicit unavailable label instead of zero.
 - Population depends on the loaded country dataset and is not real-time.
 - `games.json` remains unchanged in your existing GitHub repository; this update deliberately excludes it.
+
+## v4.4 Population fix
+Country population is requested from the World Bank World Development Indicators API (`SP.POP.TOTL`, latest nonempty year), and the reference year is displayed. A bundled country metadata population is displayed as a fallback when available. Internet connectivity is required.
