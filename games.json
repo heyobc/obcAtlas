@@ -1,0 +1,80 @@
+[
+  {
+    "order": 1,
+    "name": "Wordle Türkçe",
+    "url": "https://wordleturkce.bundle.app/",
+    "category": "word"
+  },
+  {
+    "order": 2,
+    "name": "Wordle İngilizce",
+    "url": "https://www.nytimes.com/games/wordle/index.html",
+    "category": "word"
+  },
+  {
+    "order": 3,
+    "name": "Octordle",
+    "url": "https://www.merriam-webster.com/games/octordle/daily",
+    "category": "word"
+  },
+  {
+    "order": 4,
+    "name": "Fusele",
+    "url": "https://fusele.netlify.app/?daily",
+    "category": "word"
+  },
+  {
+    "order": 5,
+    "name": "Size It Up",
+    "url": "https://magnitudle.com/size-it-up",
+    "category": "logic"
+  },
+  {
+    "order": 6,
+    "name": "Parolla",
+    "url": "https://www.parolla.app/",
+    "category": "word"
+  },
+  {
+    "order": 7,
+    "name": "Connections",
+    "url": "https://www.nytimes.com/games/connections",
+    "category": "logic"
+  },
+  {
+    "order": 8,
+    "name": "Fermi",
+    "url": "https://fermi.gg/",
+    "category": "logic"
+  },
+  {
+    "order": 9,
+    "name": "Valdle",
+    "url": "https://www.valdle.gg/",
+    "category": "gaming"
+  },
+  {
+    "order": 10,
+    "name": "Dialed",
+    "url": "https://dialed.gg/",
+    "category": "gaming"
+  },
+  {
+    "order": 11,
+    "name": "Travle",
+    "url": "https://travle.earth/",
+    "category": "geo"
+  },
+  {
+    "order": 12,
+    "name": "Globle",
+    "url": "https://globle-game.com/game",
+    "category": "geo"
+  },
+  {
+    "order": 13,
+    "name": "Worldle",
+    "url": "https://worldle.teuteuf.fr/",
+    "category": "geo"
+  }
+]

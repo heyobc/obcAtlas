@@ -43,3 +43,15 @@ Map © OpenStreetMap contributors.
 ### v3.5 — irocero geography facts
 
 Click a country on the map or select a place in search to hear an irocero geography fact. Country cards also include a button to request another fact. Identification of map clicks uses OpenStreetMap Nominatim reverse geocoding and requires an internet connection; service limits apply.
+
+## v3.6 map readability
+
+- Navy theme uses a separate Natural Earth country outline overlay (world-atlas 50m).
+- Capitals use smaller dots; names show only after zooming in to reduce clutter.
+- Boundaries load from a public CDN and need an internet connection.
+
+
+### v3.7
+- Find a Turkish province by entering a plate code such as `07`, `34` or `plaka 61` in search.
+- Open the **Oyunlar** menu to add, remove and open daily game links.
+- Game shortcuts are stored in each browser's local storage; they are not automatically synced between devices or friends.

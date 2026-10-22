@@ -1,4 +1,5 @@
 import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.mjs';
+import {feature as topoFeature} from 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm';
 
 const STYLES = {
   light:'https://tiles.openfreemap.org/styles/positron',
@@ -273,6 +274,7 @@ map.on('style.load',()=>{
   applyMapLanguage();
   enhanceBaseMapStyle();
   syncNativeCapitalLayers();
+  syncCountryBorders();
   syncCapitalMapLayers();
   ensureProvinceLayers();
   updatePlateMarkers();
@@ -414,29 +416,59 @@ function capitalFeatures(){
     properties:{code:c.cca2,name:c.capital[0]}
   })).filter(f=>f.geometry.coordinates.every(Number.isFinite));
 }
+// A lightweight coastline + international boundary overlay independent of the tile theme.
+// Natural Earth 1:50m polygons, distributed in TopoJSON by world-atlas.
+let countryBorders=null;
+const BORDERS_URL='https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json';
+async function loadCountryBorders(){
+  try{
+    const response=await fetch(BORDERS_URL);
+    if(!response.ok)throw new Error(`Boundaries HTTP ${response.status}`);
+    const topology=await response.json();
+    countryBorders=topoFeature(topology,topology.objects.countries);
+    syncCountryBorders();
+  }catch(e){console.warn('Country boundary overlay unavailable; using base map boundaries',e);}
+}
+function syncCountryBorders(){
+  if(!countryBorders||!map.isStyleLoaded())return;
+  if(!map.getSource('obc-country-borders'))map.addSource('obc-country-borders',{type:'geojson',data:countryBorders});
+  const firstSymbol=map.getStyle()?.layers?.find(l=>l.type==='symbol')?.id;
+  if(!map.getLayer('obc-country-borders-line')){
+    map.addLayer({id:'obc-country-borders-line',type:'line',source:'obc-country-borders',paint:{
+      'line-color':theme==='dark'?'#a7c6ee':'#6884a7',
+      'line-width':['interpolate',['linear'],['zoom'],1,0.55,3,0.85,5,1.25,8,1.65],
+      'line-opacity':theme==='dark'?0.95:0.65,
+      'line-blur':0
+    }},firstSymbol);
+  }
+  map.setPaintProperty('obc-country-borders-line','line-color',theme==='dark'?'#a7c6ee':'#6884a7');
+  map.setPaintProperty('obc-country-borders-line','line-opacity',theme==='dark'?0.95:0.65);
+}
 function syncCapitalMapLayers(){
   if(!map.isStyleLoaded())return;
   const data={type:'FeatureCollection',features:capitalFeatures()};
   if(!map.getSource('obc-capitals'))map.addSource('obc-capitals',{type:'geojson',data});
   else map.getSource('obc-capitals').setData(data);
   if(!map.getLayer('obc-capital-halo'))map.addLayer({id:'obc-capital-halo',type:'circle',source:'obc-capitals',paint:{
-    'circle-radius':['interpolate',['linear'],['zoom'],1,4,4,6,7,8],
-    'circle-color':theme==='dark'?'#ffde70':'#bd6b07',
-    'circle-stroke-color':theme==='dark'?'#ffffff':'#ffffff',
-    'circle-stroke-width':2,
-    'circle-opacity':1
+    'circle-radius':['interpolate',['linear'],['zoom'],1,2,4,2.7,7,3.4,11,4],
+    'circle-color':theme==='dark'?'#ffda80':'#a65a07',
+    'circle-stroke-color':theme==='dark'?'#253854':'#ffffff',
+    'circle-stroke-width':1,
+    'circle-opacity':0.92
   }});
-  if(!map.getLayer('obc-capital-names'))map.addLayer({id:'obc-capital-names',type:'symbol',source:'obc-capitals',minzoom:3,layout:{
-    'text-field':['get','name'],'text-size':['interpolate',['linear'],['zoom'],3,10,7,14],
-    'text-anchor':'left','text-offset':[1.1,0], 'text-font':['Noto Sans Regular'],
-    'text-optional':true,'symbol-sort-key':0
-  },paint:{'text-color':theme==='dark'?'#ffe19a':'#8a4600',
-    'text-halo-color':theme==='dark'?'#101f37':'#ffffff','text-halo-width':2.5,
-    'text-halo-blur':0.5}});
-  map.setPaintProperty('obc-capital-halo','circle-color',theme==='dark'?'#ffde70':'#bd6b07');
-  map.setPaintProperty('obc-capital-names','text-color',theme==='dark'?'#ffe19a':'#8a4600');
-  map.setPaintProperty('obc-capital-names','text-halo-color',theme==='dark'?'#101f37':'#ffffff');
-  for(const id of ['obc-capital-halo','obc-capital-names']) map.setLayoutProperty(id,'visibility',showCapitals?'visible':'none');
+  if(!map.getLayer('obc-capital-names'))map.addLayer({id:'obc-capital-names',type:'symbol',source:'obc-capitals',minzoom:5.5,layout:{
+    'text-field':['get','name'],'text-size':['interpolate',['linear'],['zoom'],5.5,9,9,11],
+    'text-anchor':'left','text-offset':[0.65,0],
+    'text-font':['Noto Sans Regular'],
+    'text-optional':true,'text-allow-overlap':false,'symbol-sort-key':0
+  },paint:{'text-color':theme==='dark'?'#ffd994':'#8a4600',
+    'text-halo-color':theme==='dark'?'#17283f':'#ffffff','text-halo-width':1.3,
+    'text-halo-blur':0.2}});
+  map.setPaintProperty('obc-capital-halo','circle-color',theme==='dark'?'#ffda80':'#a65a07');
+  map.setPaintProperty('obc-capital-halo','circle-stroke-color',theme==='dark'?'#253854':'#ffffff');
+  map.setPaintProperty('obc-capital-names','text-color',theme==='dark'?'#ffd994':'#8a4600');
+  map.setPaintProperty('obc-capital-names','text-halo-color',theme==='dark'?'#17283f':'#ffffff');
+  for(const id of ['obc-capital-halo','obc-capital-names'])map.setLayoutProperty(id,'visibility',showCapitals?'visible':'none');
 }
 function refreshGeographyMarkers(){
   for(const m of [...flagMarkers,...capitalMarkers])m.remove();
@@ -572,7 +604,22 @@ function renderSearchResults(places){
   }
   resultPanel.hidden=false;
 }
+function focusPlate(code){
+  if(!provinceData){setStatus(lang==='tr'?'İl verileri henüz yüklenmedi. Tekrar dene.':'Province data is not ready. Try again.');return;}
+  const f=provinceData.features.find(f=>Number(f.properties?.plaka??f.properties?.il_kodu)===code);
+  if(!f){setStatus(lang==='tr'?'Plaka bulunamadı.':'Plate code not found.');return;}
+  const pts=[];
+  function scan(v){if(!Array.isArray(v))return;if(typeof v[0]==='number'&&typeof v[1]==='number')pts.push(v);else v.forEach(scan)}
+  scan(f.geometry.coordinates);if(!pts.length)return;
+  const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);const lo=Math.min(...xs),hi=Math.max(...xs),bottom=Math.min(...ys),top=Math.max(...ys);
+  map.fitBounds([[lo,bottom],[hi,top]],{padding:90,maxZoom:10,duration:1100});
+  const name=f.properties?.il_adi||f.properties?.name||String(code);
+  showInfo(name,`${lang==='tr'?'Plaka kodu':'Plate code'}: ${String(code).padStart(2,'0')}`,{lat:(bottom+top)/2,lng:(lo+hi)/2},t('province'));
+  closeSearchResults();setStatus('');
+}
 async function searchPlace(query){
+  const plate=query.trim().match(/^(?:plaka\s*[:#-]?\s*)?(\d{1,2})$/i);
+  if(plate){const code=Number(plate[1]);if(code>=1&&code<=81)focusPlate(code);else setStatus(lang==='tr'?'Plaka 01–81 arasında olmalı.':'Plate code must be 01–81.');return;}
   closeSearchResults();setStatus(t('searching'));els.searchButton.disabled=true;
   try{
     const endpoint=`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&addressdetails=1&dedupe=1&accept-language=${lang}&q=${encodeURIComponent(query)}`;
@@ -601,4 +648,70 @@ map.on('error',e=>{console.warn('Map:',e.error);});
 
 updateUI();
 syncGeographyControls();
+loadCountryBorders();
 fetchProvinces();
+
+// Shared daily games: committed in games.json and displayed in the author's order.
+const gamesButton=document.getElementById('gamesButton');
+const gamesPanel=document.getElementById('gamesPanel');
+const gamesList=document.getElementById('gamesList');
+const gameFilters=document.getElementById('gameFilters');
+let sharedGames=[];
+let activeGameFilter='all';
+const gameCategories={
+  all:{tr:'Hepsi',en:'All'},
+  word:{tr:'Kelime',en:'Words'},
+  logic:{tr:'Mantık / Bilgi',en:'Logic / Trivia'},
+  gaming:{tr:'Oyun karakterleri',en:'Game Characters'},
+  geo:{tr:'Coğrafya',en:'Geography'}
+};
+function gameTranslation(key){return gameCategories[key]?.[lang]||key;}
+function renderGames(){
+  document.getElementById('gamesHeading').textContent=lang==='tr'?'Günlük Oyunlar':'Daily Games';
+  document.getElementById('gamesIntro').textContent=lang==='tr'?'Arkadaşlarınla oynadığın oyunlar. Bağlantılar yeni sekmede açılır.':'Your daily games. Links open in a new tab.';
+  document.getElementById('gamesFooter').textContent=lang==='tr'?'Ortak liste GitHub’daki games.json dosyasından yüklenir.':'Shared list loads from games.json on GitHub.';
+  gameFilters.replaceChildren();
+  for(const key of Object.keys(gameCategories)){
+    const button=document.createElement('button');
+    button.type='button';button.textContent=gameTranslation(key);
+    button.className='game-filter'+(key===activeGameFilter?' is-active':'');
+    button.setAttribute('aria-pressed',String(key===activeGameFilter));
+    button.addEventListener('click',()=>{activeGameFilter=key;renderGames();});
+    gameFilters.append(button);
+  }
+  gamesList.replaceChildren();
+  const displayed=sharedGames.filter(g=>activeGameFilter==='all'||g.category===activeGameFilter);
+  if(!displayed.length){
+    const empty=document.createElement('p');empty.className='games-empty';
+    empty.textContent=lang==='tr'?'Bu kategoride oyun bulunamadı.':'No games in this category.';
+    gamesList.append(empty);return;
+  }
+  for(const g of displayed){
+    const item=document.createElement('div');item.className='game-item';
+    const order=document.createElement('span');order.className='game-order';order.textContent=String(g.order).padStart(2,'0');
+    const link=document.createElement('a');link.textContent=g.name;link.href=g.url;
+    link.target='_blank';link.rel='noopener noreferrer';
+    const category=document.createElement('span');category.className='game-category';category.textContent=gameTranslation(g.category);
+    const arrow=document.createElement('span');arrow.className='game-arrow';arrow.textContent='↗';arrow.setAttribute('aria-hidden','true');
+    item.append(order,link,category,arrow);gamesList.append(item);
+  }
+}
+async function loadSharedGames(){
+  try{
+    const response=await fetch('./games.json',{cache:'no-cache'});
+    if(!response.ok)throw Error('HTTP '+response.status);
+    const data=await response.json();
+    if(!Array.isArray(data))throw Error('Invalid games.json');
+    sharedGames=data.filter(g=>Number.isInteger(g.order)&&typeof g.name==='string'&&typeof g.category==='string'&&gameCategories[g.category]&&typeof g.url==='string'&&/^https?:\/\//i.test(g.url))
+      .sort((a,b)=>a.order-b.order);
+    renderGames();
+  }catch(e){
+    console.warn('Game list could not be loaded:',e);
+    gamesList.textContent=lang==='tr'?'Oyun listesi yüklenemedi. games.json dosyasını kontrol et.':'Could not load games.json.';
+  }
+}
+gamesButton.addEventListener('click',()=>{gamesPanel.hidden=!gamesPanel.hidden;gamesButton.setAttribute('aria-expanded',String(!gamesPanel.hidden));});
+document.getElementById('closeGames').addEventListener('click',()=>{gamesPanel.hidden=true;gamesButton.setAttribute('aria-expanded','false');});
+// Translation is refreshed whenever the existing language button is used.
+els.languageButton.addEventListener('click',renderGames);
+renderGames();loadSharedGames();
