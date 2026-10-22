@@ -30,3 +30,16 @@ Map © OpenStreetMap contributors.
 - Capital markers use high-contrast golden stars in dark mode.
 - Flags and capitals toggles explicitly show their current on/off state.
 - Native capital labels are also hidden when capitals are turned off (for style layers identified as capitals).
+
+
+## v3.4 — irocero Adventures (prototype)
+
+- The explorer cat can be dragged independently of its fixed control panel.
+- Sleeping changes the cat into a curled-up pose, with breathing motion.
+- Country cards include curated regional dishes for selected countries; selecting a dish feeds irocero.
+- The food list is not exhaustive, and dishes are not presented as official national dishes.
+- Map tiles, country information, and geocoding require an internet connection.
+
+### v3.5 — irocero geography facts
+
+Click a country on the map or select a place in search to hear an irocero geography fact. Country cards also include a button to request another fact. Identification of map clicks uses OpenStreetMap Nominatim reverse geocoding and requires an internet connection; service limits apply.

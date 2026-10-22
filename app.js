@@ -273,22 +273,43 @@ map.on('style.load',()=>{
   applyMapLanguage();
   enhanceBaseMapStyle();
   syncNativeCapitalLayers();
+  syncCapitalMapLayers();
   ensureProvinceLayers();
   updatePlateMarkers();
 });
 
 map.on('zoomend',updatePlateMarkers);
 
-map.on('click',e=>{
+// Resolve a clicked land location to a country instead of only showing coordinates.
+let countryClickRequest=0;
+map.on('click',async e=>{
+  const requestId=++countryClickRequest;
   const features=showPlates&&map.getLayer('turkey-boundaries')
-    ? map.queryRenderedFeatures(e.point,{layers:['turkey-boundaries']})
-    : [];
+    ? map.queryRenderedFeatures(e.point,{layers:['turkey-boundaries']}) : [];
   if(features.length){
     const p=features[0].properties;
     showInfo(p.il_adi,`${t('plate')}: ${String(p.plaka??p.il_kodu).padStart(2,'0')}`,e.lngLat,t('province'));
+    const tr=countries.find(c=>c.cca2==='TR');
+    if(tr){chosenCountry=tr;sayCat(countryFact(tr),'explore');addFactReplayButton(tr);}
     return;
   }
-  showInfo(`${e.lngLat.lat.toFixed(3)}°, ${e.lngLat.lng.toFixed(3)}°`,lang==='tr'?'Seçtiğin harita noktası.':'Selected map point.',e.lngLat,t('location'));
+  if(!countries.length){
+    showInfo(`${e.lngLat.lat.toFixed(3)}°, ${e.lngLat.lng.toFixed(3)}°`,lang==='tr'?'Ülke verileri henüz yüklenmedi.':'Country data is not loaded yet.',e.lngLat,t('location'));
+    return;
+  }
+  try{
+    const url=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=3&addressdetails=1&accept-language=${lang}&lat=${e.lngLat.lat}&lon=${e.lngLat.lng}`;
+    const response=await fetch(url);
+    if(!response.ok)throw Error(`Reverse lookup HTTP ${response.status}`);
+    const place=await response.json();
+    if(requestId!==countryClickRequest)return;
+    const country=findCountry(place);
+    if(country)showCountry(country,e.lngLat);
+    else showInfo(`${e.lngLat.lat.toFixed(3)}°, ${e.lngLat.lng.toFixed(3)}°`,lang==='tr'?'Bu konum için ülke bilgisi bulunamadı.':'No country found for this location.',e.lngLat,t('location'));
+  }catch(err){
+    console.warn('Country identification failed',err);
+    if(requestId===countryClickRequest)showInfo(`${e.lngLat.lat.toFixed(3)}°, ${e.lngLat.lng.toFixed(3)}°`,lang==='tr'?'Konum bilgisi alınamadı. Ülkeyi arama kutusundan seçebilirsin.':'Location lookup failed. Try the search box.',e.lngLat,t('location'));
+  }
 });
 
 async function fetchProvinces(){
@@ -316,10 +337,121 @@ function syncNativeCapitalLayers(){const style=map.getStyle();if(!style?.layers)
 const flagIcon=code=>code?.replace(/./g,ch=>String.fromCodePoint(127397+ch.charCodeAt(0)))||'⚑';
 const countryCode=c=>c.cca2?.toLowerCase();
 const cleanName=c=>c.translations?.[lang==='tr'?'tur':'eng']?.common||c.name?.common||c.cca2;
-function countryFact(c){const capital=c.capital?.[0]||'—';return lang==='tr'?`${cleanName(c)} için başkent ${capital}. ${c.region||''} bölgesinde yer alır.`:`The capital of ${cleanName(c)} is ${capital}. Region: ${c.region||'—'}.`;}
+const GEO_FACTS={
+ TR:['Türkiye hem Avrupa hem Asya kıtalarında yer alır.','Türkiye üç tarafı denizlerle çevrili bir ülkedir.'],
+ JP:['Japonya binlerce adadan oluşan bir takımadalar ülkesidir.','Fuji Dağı, Japonya’nın en tanınan doğal simgelerinden biridir.'],
+ IT:['İtalya’nın haritadaki şekli bir çizmeye benzetilir.','İtalya sınırlarında Vatikan ve San Marino adlı iki bağımsız devlet yer alır.'],
+ BR:['Amazon Nehri ve Amazon yağmur ormanlarının önemli bir bölümü Brezilya’dadır.'],
+ AU:['Avustralya hem bir ülke hem de bir kıta olarak anılır.'],
+ CA:['Kanada dünyanın yüzölçümü en büyük ikinci ülkesidir.'],
+ EG:['Nil Nehri Mısır’dan geçerek Akdeniz’e dökülür.'],
+ ID:['Endonezya binlerce adadan oluşur.'],
+ IS:['İzlanda, Kuzey Atlantik’te volkanik bir ada ülkesidir.'],
+ GR:['Yunanistan’ın Ege ve İyon denizlerinde çok sayıda adası bulunur.']
+};
+let factIndex=0;
+function countryFact(c){
+  const capital=c.capital?.[0]||'—';
+  const facts=GEO_FACTS[c.cca2];
+  if(lang==='tr'&&facts?.length)return `${cleanName(c)}: ${facts[factIndex++%facts.length]}`;
+  const pop=c.population?Number(c.population).toLocaleString(lang==='tr'?'tr-TR':'en-US'):'—';
+  return lang==='tr'
+    ? `${cleanName(c)} ülkesinin başkenti ${capital}. Bölge: ${c.region||'—'}. Nüfus: ${pop}.`
+    : `${cleanName(c)} — Capital: ${capital}. Region: ${c.region||'—'}. Population: ${pop}.`;
+}
+function addFactReplayButton(c){
+  let button=document.getElementById('countryFactReplay');
+  if(!button){button=document.createElement('button');button.id='countryFactReplay';button.type='button';button.className='fact-replay';}
+  button.textContent=lang==='tr'?'🐱 irocero’dan bilgi al':'🐱 Ask irocero for a fact';
+  button.onclick=()=>{
+    if(!catPrefs.facts){catPrefs.facts=true;updateCat();}
+    sayCat(countryFact(c),'explore');
+  };
+  els.infoDescription.append(button);
+}
+
 function findCountry(place){const a=place.address||{};const code=a.country_code?.toUpperCase();if(code)return countries.find(c=>c.cca2===code);return null;}
-function showCountry(c,coord){const place=coord||{lat:c.latlng?.[0]||0,lng:c.latlng?.[1]||0};showInfo(`${flagIcon(c.cca2)} ${cleanName(c)}`,countryFact(c),place,lang==='tr'?'ÜLKE':'COUNTRY');const image=document.createElement('div');image.className='country-card';const flag=document.createElement('img');flag.src=`https://flagcdn.com/w160/${countryCode(c)}.png`;flag.alt=cleanName(c);flag.loading='lazy';flag.onerror=()=>{flag.replaceWith(document.createTextNode(flagIcon(c.cca2)+' '));};const name=document.createElement('strong');name.textContent=cleanName(c);image.append(flag,name);const stats=document.createElement('div');stats.className='country-stats';const rows=[[lang==='tr'?'Başkent':'Capital',c.capital?.join(', ')||'—'],[lang==='tr'?'Bölge':'Region',c.region||'—'],[lang==='tr'?'Nüfus':'Population',(c.population||0).toLocaleString(lang==='tr'?'tr-TR':'en-US')],[lang==='tr'?'Yüzölçümü':'Area',`${(c.area||0).toLocaleString()} km²`]];for(const [label,value] of rows){const cell=document.createElement('div');const b=document.createElement('b');b.textContent=label;cell.append(b,document.createTextNode(value));stats.append(cell)}els.infoDescription.replaceChildren(image,stats);sayCat(countryFact(c),'explore');}
-function refreshGeographyMarkers(){for(const m of [...flagMarkers,...capitalMarkers])m.remove();flagMarkers=[];capitalMarkers=[];if(!countries.length)return;for(const c of countries){if(showFlags&&c.latlng?.length===2&&c.cca2?.length===2){const el=document.createElement('button');el.type='button';el.className='map-flag';el.title=cleanName(c);const img=document.createElement('img');img.src=`https://flagcdn.com/w40/${countryCode(c)}.png`;img.alt=cleanName(c);img.loading='lazy';img.onerror=()=>{img.remove();el.textContent=flagIcon(c.cca2);};el.append(img);el.addEventListener('click',ev=>{ev.stopPropagation();showCountry(c)});flagMarkers.push(new maplibregl.Marker({element:el}).setLngLat([c.latlng[1],c.latlng[0]]).addTo(map));}if(showCapitals&&c.capitalInfo?.latlng?.length===2){const loc=c.capitalInfo.latlng;const el=document.createElement('button');el.type='button';el.className='capital-marker';el.textContent='★';el.setAttribute('aria-label',`Capital: ${c.capital?.[0]||''}`);el.title=`★ ${c.capital?.[0]||''} — ${cleanName(c)}`;el.addEventListener('click',ev=>{ev.stopPropagation();showCountry(c,{lat:loc[0],lng:loc[1]})});capitalMarkers.push(new maplibregl.Marker({element:el}).setLngLat([loc[1],loc[0]]).addTo(map));}}}
+// Curated examples: food identities are culturally shared; no claim of an official national dish.
+const FOOD_EXAMPLES={
+ TR:[['İskender kebap','🍖'],['Baklava','🥮'],['Mantı','🥟']],JP:[['Sushi','🍣'],['Ramen','🍜'],['Onigiri','🍙']],IT:[['Pizza Margherita','🍕'],['Pasta','🍝'],['Gelato','🍨']],
+ FR:[['Croissant','🥐'],['Ratatouille','🥘']],DE:[['Bratwurst','🌭'],['Pretzel','🥨']],ES:[['Paella','🥘'],['Tortilla española','🍳']],
+ GR:[['Moussaka','🍆'],['Souvlaki','🍢']],US:[['Burger','🍔'],['Apple pie','🥧']],MX:[['Tacos','🌮'],['Tamales','🫔']],
+ BR:[['Feijoada','🥘'],['Pão de queijo','🧀']],AR:[['Empanadas','🥟'],['Asado','🍖']],CA:[['Poutine','🍟']],
+ IN:[['Biryani','🍚'],['Dosa','🥞']],CN:[['Dumplings','🥟'],['Hot pot','🍲']],KR:[['Bibimbap','🍚'],['Kimchi','🥬']],
+ TH:[['Pad thai','🍜'],['Tom yum','🍲']],VN:[['Phở','🍜'],['Bánh mì','🥖']],ID:[['Nasi goreng','🍚'],['Satay','🍢']],
+ EG:[['Koshari','🍚']],MA:[['Tagine','🥘'],['Couscous','🍚']],GB:[['Fish and chips','🐟']],UA:[['Borshch','🍲']],
+ AU:[['Meat pie','🥧']],NZ:[['Pavlova','🍰']],PT:[['Pastel de nata','🥧']],PL:[['Pierogi','🥟']],
+ SE:[['Köttbullar','🍖']],NO:[['Fårikål','🍲']],FI:[['Karjalanpiirakka','🥧']],IL:[['Shakshuka','🍳']],
+ LB:[['Tabbouleh','🥗']],ET:[['Injera','🫓']],NG:[['Jollof rice','🍚']],ZA:[['Bobotie','🥘']]
+};
+let chosenCountry=null;
+function addCountryFoods(c){
+  chosenCountry=c;
+  const foods=FOOD_EXAMPLES[c.cca2]||[];
+  const section=document.createElement('section');section.className='country-foods';
+  const title=document.createElement('strong');title.textContent=lang==='tr'?'Yerel yemekler · irocero ile dene':'Local dishes · feed irocero';section.append(title);
+  if(!foods.length){const note=document.createElement('p');note.textContent=lang==='tr'?'Bu ülke için yemekler henüz eklenmedi.':'Dishes for this country are not added yet.';section.append(note);return section;}
+  const list=document.createElement('div');list.className='food-options';
+  for(const [name,emoji] of foods){const b=document.createElement('button');b.type='button';b.textContent=emoji+' '+name;
+    b.addEventListener('click',()=>feedLocalFood(name,emoji,c));list.append(b);
+  }section.append(list);return section;
+}
+function feedLocalFood(name,emoji,c){
+  catPrefs.fullness=Math.min(100,catPrefs.fullness+16);
+  catPrefs.happiness=Math.min(100,catPrefs.happiness+7);
+  sayCat((lang==='tr'?'Mmm! ':'Yum! ')+name+' '+emoji+' · '+cleanName(c),'feed');
+  const floating=document.getElementById('floatingCat');
+  floating.classList.add('food-action');
+  floating.style.setProperty('--food-emoji',`"${emoji}"`);
+  clearTimeout(window.__foodAnimationTimer);
+  window.__foodAnimationTimer=setTimeout(()=>floating.classList.remove('food-action'),3100);
+  updateCat();
+}
+function showCountry(c,coord){const place=coord||{lat:c.latlng?.[0]||0,lng:c.latlng?.[1]||0};showInfo(`${flagIcon(c.cca2)} ${cleanName(c)}`,countryFact(c),place,lang==='tr'?'ÜLKE':'COUNTRY');const image=document.createElement('div');image.className='country-card';const flag=document.createElement('img');flag.src=`https://flagcdn.com/w160/${countryCode(c)}.png`;flag.alt=cleanName(c);flag.loading='lazy';flag.onerror=()=>{flag.replaceWith(document.createTextNode(flagIcon(c.cca2)+' '));};const name=document.createElement('strong');name.textContent=cleanName(c);image.append(flag,name);const stats=document.createElement('div');stats.className='country-stats';const rows=[[lang==='tr'?'Başkent':'Capital',c.capital?.join(', ')||'—'],[lang==='tr'?'Bölge':'Region',c.region||'—'],[lang==='tr'?'Nüfus':'Population',(c.population||0).toLocaleString(lang==='tr'?'tr-TR':'en-US')],[lang==='tr'?'Yüzölçümü':'Area',`${(c.area||0).toLocaleString()} km²`]];for(const [label,value] of rows){const cell=document.createElement('div');const b=document.createElement('b');b.textContent=label;cell.append(b,document.createTextNode(value));stats.append(cell)}els.infoDescription.replaceChildren(image,stats,addCountryFoods(c));addFactReplayButton(c);sayCat(countryFact(c),'explore');}
+function capitalFeatures(){
+  return countries.filter(c=>showCapitals && Array.isArray(c.capitalInfo?.latlng) && c.capitalInfo.latlng.length===2 && c.capital?.[0]).map(c=>({
+    type:'Feature', geometry:{type:'Point',coordinates:[Number(c.capitalInfo.latlng[1]),Number(c.capitalInfo.latlng[0])]},
+    properties:{code:c.cca2,name:c.capital[0]}
+  })).filter(f=>f.geometry.coordinates.every(Number.isFinite));
+}
+function syncCapitalMapLayers(){
+  if(!map.isStyleLoaded())return;
+  const data={type:'FeatureCollection',features:capitalFeatures()};
+  if(!map.getSource('obc-capitals'))map.addSource('obc-capitals',{type:'geojson',data});
+  else map.getSource('obc-capitals').setData(data);
+  if(!map.getLayer('obc-capital-halo'))map.addLayer({id:'obc-capital-halo',type:'circle',source:'obc-capitals',paint:{
+    'circle-radius':['interpolate',['linear'],['zoom'],1,4,4,6,7,8],
+    'circle-color':theme==='dark'?'#ffde70':'#bd6b07',
+    'circle-stroke-color':theme==='dark'?'#ffffff':'#ffffff',
+    'circle-stroke-width':2,
+    'circle-opacity':1
+  }});
+  if(!map.getLayer('obc-capital-names'))map.addLayer({id:'obc-capital-names',type:'symbol',source:'obc-capitals',minzoom:3,layout:{
+    'text-field':['get','name'],'text-size':['interpolate',['linear'],['zoom'],3,10,7,14],
+    'text-anchor':'left','text-offset':[1.1,0], 'text-font':['Noto Sans Regular'],
+    'text-optional':true,'symbol-sort-key':0
+  },paint:{'text-color':theme==='dark'?'#ffe19a':'#8a4600',
+    'text-halo-color':theme==='dark'?'#101f37':'#ffffff','text-halo-width':2.5,
+    'text-halo-blur':0.5}});
+  map.setPaintProperty('obc-capital-halo','circle-color',theme==='dark'?'#ffde70':'#bd6b07');
+  map.setPaintProperty('obc-capital-names','text-color',theme==='dark'?'#ffe19a':'#8a4600');
+  map.setPaintProperty('obc-capital-names','text-halo-color',theme==='dark'?'#101f37':'#ffffff');
+  for(const id of ['obc-capital-halo','obc-capital-names']) map.setLayoutProperty(id,'visibility',showCapitals?'visible':'none');
+}
+function refreshGeographyMarkers(){
+  for(const m of [...flagMarkers,...capitalMarkers])m.remove();
+  flagMarkers=[];capitalMarkers=[];
+  for(const c of countries){
+    if(showFlags&&c.latlng?.length===2&&c.cca2?.length===2){
+      const el=document.createElement('button');el.type='button';el.className='map-flag';el.title=cleanName(c);
+      const img=document.createElement('img');img.src=`https://flagcdn.com/w40/${countryCode(c)}.png`;img.alt=cleanName(c);img.loading='lazy';
+      img.onerror=()=>{img.remove();el.textContent=flagIcon(c.cca2);};el.append(img);
+      el.addEventListener('click',ev=>{ev.stopPropagation();showCountry(c)});
+      flagMarkers.push(new maplibregl.Marker({element:el}).setLngLat([c.latlng[1],c.latlng[0]]).addTo(map));
+    }
+  }
+  syncCapitalMapLayers();
+}
 flagsBtn.addEventListener('click',()=>{showFlags=!showFlags;syncGeographyControls();refreshGeographyMarkers()});
 capitalsBtn.addEventListener('click',()=>{showCapitals=!showCapitals;syncGeographyControls();syncNativeCapitalLayers();refreshGeographyMarkers()});
 async function fetchCountries(){
@@ -354,20 +486,38 @@ document.getElementById('napButton').onclick=()=>sayCat(lang==='tr'?'Biraz uyuyo
 document.getElementById('catSettingsButton').onclick=()=>{const s=document.getElementById('catSettings');s.hidden=!s.hidden};
 for(const [key,el] of [['style',catEls.style],['color',catEls.color],['eye',catEls.eye],['motion',catEls.motion],['facts',catEls.facts]])el.addEventListener('change',()=>{catPrefs[key]=el.type==='checkbox'?el.checked:el.value;updateCat()});
 document.getElementById('hideCat').onclick=()=>{catPrefs.hidden=true;updateCat()};document.getElementById('restoreCat').onclick=()=>{catPrefs.hidden=false;updateCat()};
+// Detach only the mascot illustration: the original controls panel remains anchored.
+const floatingCat=document.createElement('div');
+floatingCat.id='floatingCat';floatingCat.className='floating-cat';
+const mascotSlot=document.createElement('div');mascotSlot.className='mascot-slot';
+const detachedAvatar=document.getElementById('catAvatar');
+detachedAvatar.parentNode.insertBefore(mascotSlot,detachedAvatar);
+floatingCat.appendChild(detachedAvatar);
+document.body.appendChild(floatingCat);
+function syncFloatingAppearance(){
+  floatingCat.className='floating-cat '+['pixel','minimal','black','white','sleeping','eating','happy','explore','no-motion'].filter(c=>catPanel.classList.contains(c)).join(' ');
+  floatingCat.style.setProperty('--cat-eye',getComputedStyle(catPanel).getPropertyValue('--cat-eye')||'#e5a742');
+  floatingCat.hidden=catPrefs.hidden;
+}
+const syncMascotObserver=new MutationObserver(syncFloatingAppearance);
+syncMascotObserver.observe(catPanel,{attributes:true,attributeFilter:['class','style','hidden']});
+syncFloatingAppearance();
+// Independent dragging coordinates; old saved panel positions are intentionally reset once.
+if(!localStorage.getItem('irocero-v34-migrated')){catPrefs.position=null;saveCat();localStorage.setItem('irocero-v34-migrated','1');}
 // Drag irocero by its illustration (mouse or touch). A short tap still pets it.
 const catAvatar=document.getElementById('catAvatar');
 let draggingCat=null,ignoreNextPet=false;
 function placeCat(x,y){
-  const rect=catPanel.getBoundingClientRect();
+  const rect=floatingCat.getBoundingClientRect();
   const nx=Math.max(4,Math.min(window.innerWidth-rect.width-4,x));
   const ny=Math.max(4,Math.min(window.innerHeight-rect.height-4,y));
-  catPanel.style.left=nx+'px';catPanel.style.top=ny+'px';
-  catPanel.style.right='auto';catPanel.style.bottom='auto';
+  floatingCat.style.left=nx+'px';floatingCat.style.top=ny+'px';
+  floatingCat.style.right='auto';floatingCat.style.bottom='auto';
   return {x:nx,y:ny};
 }
 catAvatar.addEventListener('pointerdown',e=>{
   if(e.button!==0)return;
-  const r=catPanel.getBoundingClientRect();
+  const r=floatingCat.getBoundingClientRect();
   draggingCat={id:e.pointerId,startX:e.clientX,startY:e.clientY,x:r.left,y:r.top,moved:false};
   catAvatar.setPointerCapture(e.pointerId);
 });
@@ -380,7 +530,7 @@ catAvatar.addEventListener('pointermove',e=>{
 function finishCatDrag(e){
   if(!draggingCat||draggingCat.id!==e.pointerId)return;
   if(draggingCat.moved){
-    const r=catPanel.getBoundingClientRect();
+    const r=floatingCat.getBoundingClientRect();
     catPrefs.position={x:r.left,y:r.top};saveCat();
     ignoreNextPet=true;
   }
@@ -400,7 +550,7 @@ function focusPlace(place){
     const b=place.boundingbox.map(Number);
     map.fitBounds([[b[2],b[0]],[b[3],b[1]]],{padding:90,maxZoom:12,duration:1300});
   }else map.flyTo({center:[lon,lat],zoom:9});
-  const match=findCountry(place);if(match&&(place.addresstype==='country'||place.type==='administrative'&&place.addresstype==='country'||place.class==='boundary'&&place.type==='administrative'&&place.address?.country===place.name))showCountry(match,{lat,lng:lon});else{showInfo(place.name||place.display_name.split(',')[0],place.display_name,{lat,lng:lon},t('location'));if(match)sayCat(countryFact(match),'explore');}
+  const match=findCountry(place);if(match&&(place.addresstype==='country'||place.type==='administrative'&&place.addresstype==='country'||place.class==='boundary'&&place.type==='administrative'&&place.address?.country===place.name))showCountry(match,{lat,lng:lon});else{showInfo(place.name||place.display_name.split(',')[0],place.display_name,{lat,lng:lon},t('location'));if(match){chosenCountry=match;sayCat(countryFact(match),'explore');addFactReplayButton(match);}}
   closeSearchResults();setStatus('');
 }
 function renderSearchResults(places){

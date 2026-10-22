@@ -30,3 +30,38 @@
 .options button[aria-pressed="true"] {background:#2563eb;color:#fff}
 .options button[aria-pressed="false"] {background:transparent;color:var(--ink);opacity:.76}
 .maplibregl-marker:has(.capital-marker) {z-index:3}
+
+/* v3.4: stationary controls, independently draggable explorer */
+.cat-panel{position:fixed!important;left:auto!important;top:auto!important;right:18px!important;bottom:32px!important;width:218px;z-index:9}
+.cat-body{display:block}.mascot-slot{display:none}.cat-controls{width:100%}.cat-bubble{max-height:82px}
+.floating-cat{--fur:#eaa35f;--fur-dark:#a96b35;--cat-eye:#e5a742;position:fixed;left:calc(100vw - 390px);top:calc(100vh - 190px);z-index:11;touch-action:none;filter:drop-shadow(0 5px 10px #0f203955)}
+.floating-cat.black{--fur:#535c70;--fur-dark:#293344}.dark .floating-cat.black{--fur:#78859c;--fur-dark:#b7c6da}
+.floating-cat.white{--fur:#f1f3f8;--fur-dark:#9aa7b9}
+.floating-cat .cat-avatar{display:block;width:140px;height:140px;touch-action:none}
+.floating-cat .cat-avatar svg{width:138px;height:138px;overflow:visible}
+.floating-cat .cat-tail{transform-origin:110px 130px;animation:cat-tail 2.2s ease-in-out infinite}
+.floating-cat .cat-eyes{transform-origin:80px 80px;animation:cat-blink 5s infinite}
+.floating-cat .sleep-pose{display:none}
+.floating-cat.sleeping #catSvg{display:none}
+.floating-cat.sleeping .sleep-pose{display:block;animation:sleep-breath 2.5s ease-in-out infinite;transform-origin:80px 110px}
+.floating-cat.sleeping .cat-avatar{animation:none}
+.floating-cat.pixel .cat-avatar svg{image-rendering:pixelated;filter:contrast(1.35) saturate(1.25)}
+.floating-cat.minimal .cat-stripes{display:none}
+.floating-cat.no-motion *{animation:none!important;transition:none!important}
+.floating-cat.eating .cat-avatar{animation:cat-eat .5s infinite alternate}
+.floating-cat.happy .cat-avatar{animation:cat-happy .35s infinite alternate}
+.floating-cat.explore .cat-avatar{animation:cat-explore 1s infinite alternate}
+.floating-cat.food-action:after{content:var(--food-emoji,'🍽️');position:absolute;bottom:4px;left:6px;font-size:35px;pointer-events:none;animation:food-bob .6s infinite alternate}
+@keyframes food-bob{to{transform:translateY(-6px) rotate(10deg)}}
+@keyframes sleep-breath{50%{transform:scale(1.035,.97)}}
+.country-foods{border-top:1px solid var(--border);margin-top:14px;padding-top:10px}
+.country-foods>strong{font-size:13px}.country-foods p{margin:6px 0;color:var(--muted);font-size:12px}
+.food-options{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.food-options button{border:1px solid var(--border);color:var(--ink);background:var(--panel);border-radius:8px;padding:7px 9px;cursor:pointer;font:inherit;font-size:12px}
+.food-options button:hover{border-color:var(--accent)}
+@media(max-width:700px){.cat-panel{right:8px!important;bottom:8px!important;width:176px}.floating-cat{left:12px;top:calc(100vh - 180px)}.floating-cat .cat-avatar{width:110px;height:110px}.floating-cat .cat-avatar svg{width:108px;height:108px}}
+
+/* Country fact shortcut */
+.fact-replay{display:block;width:100%;margin-top:12px;padding:10px 12px;border-radius:10px;background:#2563eb;color:white;border:0;font-weight:700;cursor:pointer;}
+.fact-replay:hover{background:#1d4ed8;}
+.dark .fact-replay{background:#376eb8;color:#fff;}
