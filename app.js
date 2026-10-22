@@ -650,6 +650,23 @@ updateCat();
 if(catPrefs.position)catPrefs.position=placeCat(catPrefs.position.x,catPrefs.position.y);
 fetchCountries();
 
+// Anıtkabir: permanent real-world map marker (no automatic tribute overlay).
+const ANITKABIR=[32.83778,39.92556];
+const monumentEl=document.createElement('button');
+monumentEl.type='button';
+monumentEl.className='anitkabir-marker';
+monumentEl.title='Anıtkabir';
+monumentEl.setAttribute('aria-label','Anıtkabir');
+monumentEl.textContent='★';
+const monumentPopup=new maplibregl.Popup({offset:22,maxWidth:'280px'}).setHTML(
+  '<strong>Anıtkabir</strong><p>Mustafa Kemal Atatürk’ün anıt mezarı · Çankaya, Ankara</p><a href="https://www.anitkabir.tsk.tr/" target="_blank" rel="noopener noreferrer">Resmî web sitesi ↗</a>'
+);
+new maplibregl.Marker({element:monumentEl,anchor:'bottom'})
+  .setLngLat(ANITKABIR).setPopup(monumentPopup).addTo(map);
+function syncMonumentMarker(){monumentEl.hidden=map.getZoom()<6;}
+map.on('zoom',syncMonumentMarker);
+syncMonumentMarker();
+
 // Personal location experiences. Text is original, not presented as an Atatürk quotation.
 const specialPanel=document.getElementById('specialPanel');
 let lastSpecial='';
@@ -661,22 +678,8 @@ function showSpecial(place){
   const normalized=(place||'').toLocaleLowerCase('tr-TR');
   const isBucak=/\bbucak\b/.test(normalized);
   const isKastamonu=/\bkastamonu\b/.test(normalized);
-  const isAnkara=/\bankara\b/.test(normalized);
-  if(!isBucak && !isKastamonu && !isAnkara)return;
-  const key=isBucak?'bucak':isKastamonu?'kastamonu':'ankara';
-  if(key==='ankara'){
-    specialPanel.innerHTML='';
-    const h=document.createElement('h2');h.textContent='Ankara • Bir Cumhuriyet Hatırası';
-    const p=document.createElement('p');
-    p.textContent='13 Ekim 1923’te başkent olan Ankara, bir milletin bağımsız geleceğine duyduğu inancın simgelerinden biri. Anıtkabir’e bakarken yalnızca bir anıtı değil, bugün özgürce kurabildiğimiz hayallere uzanan büyük emeği de hatırlıyoruz.';
-    const q=document.createElement('p');q.className='tribute-line';
-    q.textContent='Saygıyla ve minnetle, Mustafa Kemal Atatürk.';
-    const a=document.createElement('a');a.href='https://www.anitkabir.tsk.tr/';a.target='_blank';a.rel='noopener noreferrer';a.textContent='Anıtkabir hakkında';
-    specialPanel.append(h,p,q,a);
-    specialPanel.hidden=false;
-    lastSpecial=key;
-    return;
-  }
+  if(!isBucak && !isKastamonu)return;
+  const key=isBucak?'bucak':'kastamonu';
   const n=Number(sessionStorage.getItem('obcAtlas.specialVisits.'+key)||'0');
   sessionStorage.setItem('obcAtlas.specialVisits.'+key,String(n+1));
   const line=specialLines[key][n%specialLines[key].length];
@@ -747,6 +750,14 @@ function focusPlate(code){
 async function searchPlace(query){
   const plate=query.trim().match(/^(?:plaka\s*[:#-]?\s*)?(\d{1,2})$/i);
   if(plate){const code=Number(plate[1]);if(code>=1&&code<=81)focusPlate(code);else setStatus(lang==='tr'?'Plaka 01–81 arasında olmalı.':'Plate code must be 01–81.');return;}
+  // Offline lookup for the custom easter-egg locations.
+  const normalized=query.toLocaleLowerCase('tr-TR').trim();
+  const local=(/^(?:bucak)(?:,|$|\s)/.test(normalized))
+    ? {name:'Bucak',display_name:'Bucak, Burdur, Türkiye',lat:37.459,lon:30.595}
+    : (/^(?:kastamonu)(?:,|$|\s)/.test(normalized))
+      ? {name:'Kastamonu',display_name:'Kastamonu, Türkiye',lat:41.389,lon:33.783}
+      : null;
+  if(local){focusPlace(local);return;}
   closeSearchResults();setStatus(t('searching'));els.searchButton.disabled=true;
   try{
     const endpoint=`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&addressdetails=1&dedupe=1&accept-language=${lang}&q=${encodeURIComponent(query)}`;
@@ -758,12 +769,14 @@ async function searchPlace(query){
     setStatus('');
   }catch(err){
     console.warn(err);
-    setStatus(lang==='tr'?'Arama şu anda kullanılamıyor.':'Search is currently unavailable.');
+    setStatus(lang==='tr'
+      ? `Arama servisine ulaşılamadı (${err?.message||'bağlantı hatası'}). Bucak, Kastamonu ve plakaları doğrudan arayabilirsin.`
+      : `Search service unavailable (${err?.message||'connection error'}). Bucak, Kastamonu and plate searches work offline.`);
   }finally{els.searchButton.disabled=false;}
 }
 resultPanel.addEventListener('keydown',e=>{if(e.key==='Escape')closeSearchResults();});
 window.addEventListener('keydown',e=>{if(e.key==='Escape')closeSearchResults();});
-document.addEventListener('pointerdown',e=>{if(!els.searchForm.contains(e.target))closeSearchResults();});
+document.addEventListener('pointerdown',e=>{if(!els.searchForm.contains(e.target) && !resultPanel.contains(e.target))closeSearchResults();});
 
 els.searchForm.addEventListener('submit',event=>{
   event.preventDefault();

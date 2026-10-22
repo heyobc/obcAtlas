@@ -58,7 +58,7 @@ Click a country on the map or select a place in search to hear an irocero geogra
 
 ## v3.9 personal additions
 - **Şehirler / Cities** toggle: settlement labels are hidden by default for a cleaner world view.
-- Ankara remembrance panel referencing Anıtkabir and the founding of the Republic. The tribute is original text, not a historical quotation.
+- Ankara has a separate clickable Anıtkabir monument marker at its real location. The previous tribute panel was removed.
 - irocero reacts to Bucak and Kastamonu with rotating greetings.
 - Secret route: visit Bucak and Kastamonu consecutively in either order during the same browser session.
 - Country population is already shown on country cards.
@@ -68,3 +68,14 @@ Click a country on the map or select a place in search to hear an irocero geogra
 - Boundary display cycles through `Ülkeler`, `Ülke + Bölge`, `Tüm sınırlar`. Fine administrative boundaries depend on the base-map data/zoom; the international overlay always stays visible.
 - Native capital labels are hidden to prevent duplicated names; our capital markers and labels use a distinct golden style. Normal cities are hidden by default and can be shown with `Şehirler`.
 - If a provider omits settlement layers or capitals, availability depends on the map/country datasets.
+
+## v4.1
+- Removed the automatic Ankara remembrance panel.
+- Added a clickable Anıtkabir pin at its actual location, visible after zoom 6, with short description and official website link.
+- Bucak and Kastamonu special greetings remain unchanged.
+
+
+## v4.2 search reliability
+- Bucak and Kastamonu are resolved locally for easter eggs without Nominatim.
+- Search results can be clicked without dismissal by the outside-click handler.
+- External search errors show the underlying HTTP/network message.
