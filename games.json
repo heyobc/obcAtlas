@@ -82,5 +82,12 @@
     "name": "Spelling Bee",
     "url": "https://www.nytimes.com/puzzles/spelling-bee",
     "category": "word"
+  },
+  {
+    "order": 15,
+    "name": "ya qəbul et, ya da rədd et",
+    "url": "https://oyun.azeri.net/yermisin-yemezmisin-.html",
+    "category": "logic"
   }
+
 ]
