@@ -77,4 +77,10 @@
     "url": "https://worldle.teuteuf.fr/",
     "category": "geo"
   }
+  {
+    "order": 14,
+    "name": "Spelling Bee",
+    "url": "https://www.nytimes.com/puzzles/spelling-bee",
+    "category": "word"
+  }
 ]
