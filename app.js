@@ -1,5 +1,5 @@
 import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.mjs';
-import {feature as topoFeature} from 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm';
+import {mesh as topoMesh} from 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm';
 
 const STYLES = {
   light:'https://tiles.openfreemap.org/styles/positron',
@@ -81,6 +81,66 @@ function applyMapLanguage(){
   }
 }
 
+
+// Toggle settlement labels without hiding country names and administrative borders.
+let showCities=false;
+let boundaryMode='country';
+function isSettlementLabel(layer){
+  if(layer.type!=='symbol' || !layer.layout?.['text-field'])return false;
+  const id=layer.id.toLowerCase();
+  if(id.startsWith('obc-') || /country|continent|ocean|sea|marine|water|road|highway|state|province|boundary|airport|poi|park|mountain|peak|river|lake/.test(id))return false;
+  return /city|town|village|hamlet|suburb|neighbou?rhood|settlement|place|capital|locality/.test(id);
+}
+function syncCityLabels(){
+  const layers=map.getStyle()?.layers||[];
+  for(const layer of layers){
+    if(!isSettlementLabel(layer))continue;
+    try{
+      // Native capital labels count as cities, so they must be hidden as well.
+      map.setLayoutProperty(layer.id,'visibility',showCities?'visible':'none');
+      if(showCities){
+        const id=layer.id.toLowerCase();
+        const min=/village|hamlet|suburb|neighbou?rhood|locality/.test(id)?9: /town/.test(id)?7.5:6;
+        map.setLayerZoomRange(layer.id,min,24);
+      }
+    }catch(_){}
+  }
+  const b=document.getElementById('citiesButton');
+  b.classList.toggle('active',showCities);
+  b.setAttribute('aria-pressed',String(showCities));
+  document.getElementById('citiesText').textContent=lang==='tr'
+    ?`Şehirler: ${showCities?'Açık':'Kapalı'}`:`Cities: ${showCities?'On':'Off'}`;
+}
+document.getElementById('citiesButton').addEventListener('click',()=>{
+  showCities=!showCities;
+  syncCityLabels();
+});
+const boundaryButton=document.getElementById('boundaryButton');
+function syncBoundaryMode(){
+  const label=({country:lang==='tr'?'Ülkeler':'Countries',
+     states:lang==='tr'?'Ülke + Bölge':'Country + States',
+     all:lang==='tr'?'Tüm sınırlar':'All boundaries'})[boundaryMode];
+  document.getElementById('boundaryText').textContent=label;
+  boundaryButton.title=lang==='tr'?'Sınır ayrıntısını değiştir':'Change boundary detail';
+  const detailed=boundaryMode!=='country';
+  for(const layer of map.getStyle()?.layers||[]){
+    if(layer.type!=='line')continue;
+    if(layer.id.startsWith('obc-')||layer.id==='turkey-boundaries')continue;
+    const id=layer.id.toLowerCase();
+    // Hide subordinate administrative boundaries in country-only mode.
+    if(/admin|boundary|border/.test(id)&&!/country|national|admin-0|admin_0|admin0/.test(id)){
+      try{map.setLayoutProperty(layer.id,'visibility',detailed?'visible':'none')}catch(_){}
+    }
+  }
+  if(map.getLayer('turkey-boundaries'))
+    map.setLayoutProperty('turkey-boundaries','visibility',showPlates&&detailed?'visible':'none');
+  if(map.getLayer('obc-country-borders-line'))
+    map.setLayoutProperty('obc-country-borders-line','visibility','visible');
+}
+boundaryButton.addEventListener('click',()=>{
+  boundaryMode=boundaryMode==='country'?'states':boundaryMode==='states'?'all':'country';
+  syncBoundaryMode();
+});
 function enhanceBaseMapStyle(){
   const style=map.getStyle();
   if(!style?.layers) return;
@@ -260,7 +320,7 @@ function updatePlateMarkers(){
 
 els.closeInfo.addEventListener('click',()=>{els.info.hidden=true});
 els.turkeyButton.addEventListener('click',()=>map.flyTo({center:[35.0,39.1],zoom:5.45,duration:1500}));
-els.languageButton.addEventListener('click',()=>{lang=lang==='tr'?'en':'tr';updateUI();syncGeographyControls();applyMapLanguage();updatePlateMarkers();refreshGeographyMarkers();});
+els.languageButton.addEventListener('click',()=>{lang=lang==='tr'?'en':'tr';updateUI();syncGeographyControls();applyMapLanguage();syncCityLabels();syncBoundaryMode();updatePlateMarkers();refreshGeographyMarkers();});
 els.themeButton.addEventListener('click',()=>{theme=theme==='light'?'dark':'light';document.body.classList.toggle('dark',theme==='dark');map.setStyle(STYLES[theme]);updateUI();});
 els.platesButton.addEventListener('click',()=>{
   showPlates=!showPlates;
@@ -273,7 +333,9 @@ els.platesButton.addEventListener('click',()=>{
 map.on('style.load',()=>{
   applyMapLanguage();
   enhanceBaseMapStyle();
+  syncCityLabels();
   syncNativeCapitalLayers();
+  syncBoundaryMode();
   syncCountryBorders();
   syncCapitalMapLayers();
   ensureProvinceLayers();
@@ -291,6 +353,7 @@ map.on('click',async e=>{
   if(features.length){
     const p=features[0].properties;
     showInfo(p.il_adi,`${t('plate')}: ${String(p.plaka??p.il_kodu).padStart(2,'0')}`,e.lngLat,t('province'));
+    showSpecial(p.il_adi);
     const tr=countries.find(c=>c.cca2==='TR');
     if(tr){chosenCountry=tr;sayCat(countryFact(tr),'explore');addFactReplayButton(tr);}
     return;
@@ -334,7 +397,14 @@ const resultPanel=document.getElementById('searchResults');
 const flagsBtn=document.getElementById('flagsButton'), capitalsBtn=document.getElementById('capitalButton');
 let countries=[],flagMarkers=[],capitalMarkers=[],showFlags=true,showCapitals=true;
 function syncGeographyControls(){for(const [el,on] of [[flagsBtn,showFlags],[capitalsBtn,showCapitals]]){el.classList.toggle('active',on);el.setAttribute('aria-pressed',String(on));}document.getElementById('flagsText').textContent=lang==='tr'?`Bayraklar: ${showFlags?'Açık':'Kapalı'}`:`Flags: ${showFlags?'On':'Off'}`;document.getElementById('capitalText').textContent=lang==='tr'?`Başkentler: ${showCapitals?'Açık':'Kapalı'}`:`Capitals: ${showCapitals?'On':'Off'}`;}
-function syncNativeCapitalLayers(){const style=map.getStyle();if(!style?.layers)return;for(const layer of style.layers){if(layer.type!=='symbol'||!/capital/i.test(layer.id))continue;try{map.setLayoutProperty(layer.id,'visibility',showCapitals?'visible':'none')}catch(e){console.warn('Capital visibility',e)}}}
+function syncNativeCapitalLayers(){
+  // Native capital labels are disabled; only our dedicated capital layer renders them.
+  for(const layer of map.getStyle()?.layers||[]){
+    if(layer.type==='symbol'&&/capital/i.test(layer.id)&&!layer.id.startsWith('obc-')){
+      try{map.setLayoutProperty(layer.id,'visibility','none')}catch(_){}
+    }
+  }
+}
 
 const flagIcon=code=>code?.replace(/./g,ch=>String.fromCodePoint(127397+ch.charCodeAt(0)))||'⚑';
 const countryCode=c=>c.cca2?.toLowerCase();
@@ -425,7 +495,8 @@ async function loadCountryBorders(){
     const response=await fetch(BORDERS_URL);
     if(!response.ok)throw new Error(`Boundaries HTTP ${response.status}`);
     const topology=await response.json();
-    countryBorders=topoFeature(topology,topology.objects.countries);
+    // Shared arcs only: draw international land borders, not each country's coastline.
+    countryBorders=topoMesh(topology,topology.objects.countries,(a,b)=>a!==b);
     syncCountryBorders();
   }catch(e){console.warn('Country boundary overlay unavailable; using base map boundaries',e);}
 }
@@ -435,14 +506,17 @@ function syncCountryBorders(){
   const firstSymbol=map.getStyle()?.layers?.find(l=>l.type==='symbol')?.id;
   if(!map.getLayer('obc-country-borders-line')){
     map.addLayer({id:'obc-country-borders-line',type:'line',source:'obc-country-borders',paint:{
-      'line-color':theme==='dark'?'#a7c6ee':'#6884a7',
+      'line-color':theme==='dark'?'#d6e8ff':'#4a6790',
       'line-width':['interpolate',['linear'],['zoom'],1,0.55,3,0.85,5,1.25,8,1.65],
       'line-opacity':theme==='dark'?0.95:0.65,
       'line-blur':0
     }},firstSymbol);
   }
-  map.setPaintProperty('obc-country-borders-line','line-color',theme==='dark'?'#a7c6ee':'#6884a7');
-  map.setPaintProperty('obc-country-borders-line','line-opacity',theme==='dark'?0.95:0.65);
+  map.setPaintProperty('obc-country-borders-line','line-color',theme==='dark'?'#d6e8ff':'#4a6790');
+  map.setPaintProperty('obc-country-borders-line','line-opacity',theme==='dark'?1:0.85);
+  map.setPaintProperty('obc-country-borders-line','line-width',
+    ['interpolate',['linear'],['zoom'],1,1.1,3,1.6,5,2.2,8,2.7,12,3.2]);
+  syncBoundaryMode();
 }
 function syncCapitalMapLayers(){
   if(!map.isStyleLoaded())return;
@@ -450,14 +524,14 @@ function syncCapitalMapLayers(){
   if(!map.getSource('obc-capitals'))map.addSource('obc-capitals',{type:'geojson',data});
   else map.getSource('obc-capitals').setData(data);
   if(!map.getLayer('obc-capital-halo'))map.addLayer({id:'obc-capital-halo',type:'circle',source:'obc-capitals',paint:{
-    'circle-radius':['interpolate',['linear'],['zoom'],1,2,4,2.7,7,3.4,11,4],
+    'circle-radius':['interpolate',['linear'],['zoom'],1,1.6,4,2.1,7,2.8,11,3.3],
     'circle-color':theme==='dark'?'#ffda80':'#a65a07',
     'circle-stroke-color':theme==='dark'?'#253854':'#ffffff',
     'circle-stroke-width':1,
     'circle-opacity':0.92
   }});
-  if(!map.getLayer('obc-capital-names'))map.addLayer({id:'obc-capital-names',type:'symbol',source:'obc-capitals',minzoom:5.5,layout:{
-    'text-field':['get','name'],'text-size':['interpolate',['linear'],['zoom'],5.5,9,9,11],
+  if(!map.getLayer('obc-capital-names'))map.addLayer({id:'obc-capital-names',type:'symbol',source:'obc-capitals',minzoom:4.5,layout:{
+    'text-field':['get','name'],'text-size':['interpolate',['linear'],['zoom'],4.5,9,9,11],
     'text-anchor':'left','text-offset':[0.65,0],
     'text-font':['Noto Sans Regular'],
     'text-optional':true,'text-allow-overlap':false,'symbol-sort-key':0
@@ -575,6 +649,57 @@ window.addEventListener('resize',()=>{if(catPrefs.position){catPrefs.position=pl
 updateCat();
 if(catPrefs.position)catPrefs.position=placeCat(catPrefs.position.x,catPrefs.position.y);
 fetchCountries();
+
+// Personal location experiences. Text is original, not presented as an Atatürk quotation.
+const specialPanel=document.getElementById('specialPanel');
+let lastSpecial='';
+const specialLines={
+  bucak:['mrbbb','sellllaammmmm','ne diyosunnn fistik'],
+  kastamonu:['sellllaammmmm','mrbbb','ne diyosunnn fistik']
+};
+function showSpecial(place){
+  const normalized=(place||'').toLocaleLowerCase('tr-TR');
+  const isBucak=/\bbucak\b/.test(normalized);
+  const isKastamonu=/\bkastamonu\b/.test(normalized);
+  const isAnkara=/\bankara\b/.test(normalized);
+  if(!isBucak && !isKastamonu && !isAnkara)return;
+  const key=isBucak?'bucak':isKastamonu?'kastamonu':'ankara';
+  if(key==='ankara'){
+    specialPanel.innerHTML='';
+    const h=document.createElement('h2');h.textContent='Ankara • Bir Cumhuriyet Hatırası';
+    const p=document.createElement('p');
+    p.textContent='13 Ekim 1923’te başkent olan Ankara, bir milletin bağımsız geleceğine duyduğu inancın simgelerinden biri. Anıtkabir’e bakarken yalnızca bir anıtı değil, bugün özgürce kurabildiğimiz hayallere uzanan büyük emeği de hatırlıyoruz.';
+    const q=document.createElement('p');q.className='tribute-line';
+    q.textContent='Saygıyla ve minnetle, Mustafa Kemal Atatürk.';
+    const a=document.createElement('a');a.href='https://www.anitkabir.tsk.tr/';a.target='_blank';a.rel='noopener noreferrer';a.textContent='Anıtkabir hakkında';
+    specialPanel.append(h,p,q,a);
+    specialPanel.hidden=false;
+    lastSpecial=key;
+    return;
+  }
+  const n=Number(sessionStorage.getItem('obcAtlas.specialVisits.'+key)||'0');
+  sessionStorage.setItem('obcAtlas.specialVisits.'+key,String(n+1));
+  const line=specialLines[key][n%specialLines[key].length];
+  sayCat(line,'explore');
+  specialPanel.replaceChildren();
+  const h=document.createElement('h2');h.textContent=key==='bucak'?'Bucak sürprizi!':'Kastamonu sürprizi!';
+  const p=document.createElement('p');p.textContent=`irocero: ${line}`;
+  specialPanel.append(h,p);
+  specialPanel.hidden=false;
+  const seq=JSON.parse(sessionStorage.getItem('obcAtlas.secretRoute')||'[]');
+  seq.push(key);
+  const last=seq.slice(-2);
+  sessionStorage.setItem('obcAtlas.secretRoute',JSON.stringify(last));
+  if(last.join('>')==='bucak>kastamonu' || last.join('>')==='kastamonu>bucak'){
+    const secret=document.createElement('p');secret.className='secret-message';
+    secret.textContent='Gizli rota bulundu! Bucak ve Kastamonu aynı haritada buluştu. irocero: sellllaammmmm! ✨';
+    specialPanel.append(secret);
+    sayCat('sellllaammmmm! Gizli rota bulundu!','explore');
+  }
+  lastSpecial=key;
+}
+document.getElementById('closeSpecial').addEventListener('click',()=>specialPanel.hidden=true);
+
 function closeSearchResults(){resultPanel.hidden=true;resultPanel.replaceChildren();}
 function focusPlace(place){
   const lon=Number(place.lon),lat=Number(place.lat);
@@ -583,6 +708,7 @@ function focusPlace(place){
     map.fitBounds([[b[2],b[0]],[b[3],b[1]]],{padding:90,maxZoom:12,duration:1300});
   }else map.flyTo({center:[lon,lat],zoom:9});
   const match=findCountry(place);if(match&&(place.addresstype==='country'||place.type==='administrative'&&place.addresstype==='country'||place.class==='boundary'&&place.type==='administrative'&&place.address?.country===place.name))showCountry(match,{lat,lng:lon});else{showInfo(place.name||place.display_name.split(',')[0],place.display_name,{lat,lng:lon},t('location'));if(match){chosenCountry=match;sayCat(countryFact(match),'explore');addFactReplayButton(match);}}
+  showSpecial(place.display_name||place.name||'');
   closeSearchResults();setStatus('');
 }
 function renderSearchResults(places){
@@ -615,6 +741,7 @@ function focusPlate(code){
   map.fitBounds([[lo,bottom],[hi,top]],{padding:90,maxZoom:10,duration:1100});
   const name=f.properties?.il_adi||f.properties?.name||String(code);
   showInfo(name,`${lang==='tr'?'Plaka kodu':'Plate code'}: ${String(code).padStart(2,'0')}`,{lat:(bottom+top)/2,lng:(lo+hi)/2},t('province'));
+  showSpecial(name);
   closeSearchResults();setStatus('');
 }
 async function searchPlace(query){
@@ -715,3 +842,5 @@ document.getElementById('closeGames').addEventListener('click',()=>{gamesPanel.h
 // Translation is refreshed whenever the existing language button is used.
 els.languageButton.addEventListener('click',renderGames);
 renderGames();loadSharedGames();
+
+window.addEventListener('keydown',e=>{if(e.key==='Escape')specialPanel.hidden=true;});

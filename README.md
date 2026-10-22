@@ -55,3 +55,16 @@ Click a country on the map or select a place in search to hear an irocero geogra
 - Find a Turkish province by entering a plate code such as `07`, `34` or `plaka 61` in search.
 - Open the **Oyunlar** menu to add, remove and open daily game links.
 - Game shortcuts are stored in each browser's local storage; they are not automatically synced between devices or friends.
+
+## v3.9 personal additions
+- **Şehirler / Cities** toggle: settlement labels are hidden by default for a cleaner world view.
+- Ankara remembrance panel referencing Anıtkabir and the founding of the Republic. The tribute is original text, not a historical quotation.
+- irocero reacts to Bucak and Kastamonu with rotating greetings.
+- Secret route: visit Bucak and Kastamonu consecutively in either order during the same browser session.
+- Country population is already shown on country cards.
+
+## v4.0 — Borders and capital cities
+- Dedicated international land-boundary layer worldwide (Natural Earth 1:50m through `world-atlas` TopoJSON). Countries whose boundary treatment is politically disputed may require a separate data policy.
+- Boundary display cycles through `Ülkeler`, `Ülke + Bölge`, `Tüm sınırlar`. Fine administrative boundaries depend on the base-map data/zoom; the international overlay always stays visible.
+- Native capital labels are hidden to prevent duplicated names; our capital markers and labels use a distinct golden style. Normal cities are hidden by default and can be shown with `Şehirler`.
+- If a provider omits settlement layers or capitals, availability depends on the map/country datasets.

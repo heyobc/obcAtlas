@@ -88,3 +88,16 @@
 .game-order{font-size:11px;font-variant-numeric:tabular-nums;min-width:20px;color:var(--muted)}
 .game-category{font-size:10px;color:var(--muted);max-width:90px;text-align:right}
 .game-arrow{color:var(--muted)}
+
+.special-panel{position:absolute;z-index:19;left:20px;bottom:100px;width:min(390px,calc(100vw - 40px));padding:20px;background:var(--panel);color:var(--ink);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);line-height:1.6}
+.special-panel[hidden]{display:none}
+.special-panel h2{margin:0 30px 8px 0;font-size:18px}
+.special-panel p{margin:7px 0}
+.special-panel .tribute-line{font-style:italic;font-weight:750}
+.special-panel a{color:var(--accent)}
+.special-panel .secret-message{border-top:1px solid var(--border);padding-top:10px;font-weight:750}
+.close-special{display:none}
+@media(max-width:840px){.special-panel{left:8px;bottom:100px;max-height:36vh;overflow:auto}}
+
+.special-panel:not([hidden]) + .close-special{display:block;position:absolute;z-index:20;left:min(382px,calc(100vw - 70px));bottom:calc(100px + 12px);border:none;background:transparent;color:var(--ink);font-size:24px;cursor:pointer}
+@media(max-width:840px){.special-panel:not([hidden]) + .close-special{left:min(370px,calc(100vw - 40px))}}
