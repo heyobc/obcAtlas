@@ -108,3 +108,6 @@
 .anitkabir-marker:hover{background:#d25151}
 .maplibregl-popup-content{color:#17243b;line-height:1.5}
 .maplibregl-popup-content p{margin:6px 0}
+
+.country-population-extra{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;margin:10px 0;border-radius:10px;background:rgba(100,145,198,.14);font-size:13px}
+.country-population-extra span{font-variant-numeric:tabular-nums;font-weight:700}

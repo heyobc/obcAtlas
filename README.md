@@ -79,3 +79,9 @@ Click a country on the map or select a place in search to hear an irocero geogra
 - Bucak and Kastamonu are resolved locally for easter eggs without Nominatim.
 - Search results can be clicked without dismissal by the outside-click handler.
 - External search errors show the underlying HTTP/network message.
+
+## v4.3 Population fix
+- Country cards and city/province details show country population when data is available.
+- Missing population values display an explicit unavailable label instead of zero.
+- Population depends on the loaded country dataset and is not real-time.
+- `games.json` remains unchanged in your existing GitHub repository; this update deliberately excludes it.

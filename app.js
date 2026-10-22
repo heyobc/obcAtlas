@@ -355,7 +355,7 @@ map.on('click',async e=>{
     showInfo(p.il_adi,`${t('plate')}: ${String(p.plaka??p.il_kodu).padStart(2,'0')}`,e.lngLat,t('province'));
     showSpecial(p.il_adi);
     const tr=countries.find(c=>c.cca2==='TR');
-    if(tr){chosenCountry=tr;sayCat(countryFact(tr),'explore');addFactReplayButton(tr);}
+    if(tr){chosenCountry=tr;addCountryPopulation(tr);sayCat(countryFact(tr),'explore');addFactReplayButton(tr);}
     return;
   }
   if(!countries.length){
@@ -426,7 +426,7 @@ function countryFact(c){
   const capital=c.capital?.[0]||'—';
   const facts=GEO_FACTS[c.cca2];
   if(lang==='tr'&&facts?.length)return `${cleanName(c)}: ${facts[factIndex++%facts.length]}`;
-  const pop=c.population?Number(c.population).toLocaleString(lang==='tr'?'tr-TR':'en-US'):'—';
+  const pop=formatPopulation(c);
   return lang==='tr'
     ? `${cleanName(c)} ülkesinin başkenti ${capital}. Bölge: ${c.region||'—'}. Nüfus: ${pop}.`
     : `${cleanName(c)} — Capital: ${capital}. Region: ${c.region||'—'}. Population: ${pop}.`;
@@ -479,7 +479,18 @@ function feedLocalFood(name,emoji,c){
   window.__foodAnimationTimer=setTimeout(()=>floating.classList.remove('food-action'),3100);
   updateCat();
 }
-function showCountry(c,coord){const place=coord||{lat:c.latlng?.[0]||0,lng:c.latlng?.[1]||0};showInfo(`${flagIcon(c.cca2)} ${cleanName(c)}`,countryFact(c),place,lang==='tr'?'ÜLKE':'COUNTRY');const image=document.createElement('div');image.className='country-card';const flag=document.createElement('img');flag.src=`https://flagcdn.com/w160/${countryCode(c)}.png`;flag.alt=cleanName(c);flag.loading='lazy';flag.onerror=()=>{flag.replaceWith(document.createTextNode(flagIcon(c.cca2)+' '));};const name=document.createElement('strong');name.textContent=cleanName(c);image.append(flag,name);const stats=document.createElement('div');stats.className='country-stats';const rows=[[lang==='tr'?'Başkent':'Capital',c.capital?.join(', ')||'—'],[lang==='tr'?'Bölge':'Region',c.region||'—'],[lang==='tr'?'Nüfus':'Population',(c.population||0).toLocaleString(lang==='tr'?'tr-TR':'en-US')],[lang==='tr'?'Yüzölçümü':'Area',`${(c.area||0).toLocaleString()} km²`]];for(const [label,value] of rows){const cell=document.createElement('div');const b=document.createElement('b');b.textContent=label;cell.append(b,document.createTextNode(value));stats.append(cell)}els.infoDescription.replaceChildren(image,stats,addCountryFoods(c));addFactReplayButton(c);sayCat(countryFact(c),'explore');}
+function formatPopulation(c){
+  const pop=Number(c?.population);
+  return Number.isFinite(pop)&&pop>0?pop.toLocaleString(lang==='tr'?'tr-TR':'en-US'):(lang==='tr'?'Veri bulunamadı':'Data unavailable');
+}
+function addCountryPopulation(c){
+  if(!c)return;
+  const row=document.createElement('div');row.className='country-population-extra';
+  const b=document.createElement('strong');b.textContent=lang==='tr'?'Ülke nüfusu':'Country population';
+  const val=document.createElement('span');val.textContent=formatPopulation(c);
+  row.append(b,val);els.infoDescription.append(row);
+}
+function showCountry(c,coord){const place=coord||{lat:c.latlng?.[0]||0,lng:c.latlng?.[1]||0};showInfo(`${flagIcon(c.cca2)} ${cleanName(c)}`,countryFact(c),place,lang==='tr'?'ÜLKE':'COUNTRY');const image=document.createElement('div');image.className='country-card';const flag=document.createElement('img');flag.src=`https://flagcdn.com/w160/${countryCode(c)}.png`;flag.alt=cleanName(c);flag.loading='lazy';flag.onerror=()=>{flag.replaceWith(document.createTextNode(flagIcon(c.cca2)+' '));};const name=document.createElement('strong');name.textContent=cleanName(c);image.append(flag,name);const stats=document.createElement('div');stats.className='country-stats';const rows=[[lang==='tr'?'Başkent':'Capital',c.capital?.join(', ')||'—'],[lang==='tr'?'Bölge':'Region',c.region||'—'],[lang==='tr'?'Nüfus':'Population',formatPopulation(c)],[lang==='tr'?'Yüzölçümü':'Area',`${(c.area||0).toLocaleString()} km²`]];for(const [label,value] of rows){const cell=document.createElement('div');const b=document.createElement('b');b.textContent=label;cell.append(b,document.createTextNode(value));stats.append(cell)}els.infoDescription.replaceChildren(image,stats,addCountryFoods(c));addFactReplayButton(c);sayCat(countryFact(c),'explore');}
 function capitalFeatures(){
   return countries.filter(c=>showCapitals && Array.isArray(c.capitalInfo?.latlng) && c.capitalInfo.latlng.length===2 && c.capital?.[0]).map(c=>({
     type:'Feature', geometry:{type:'Point',coordinates:[Number(c.capitalInfo.latlng[1]),Number(c.capitalInfo.latlng[0])]},
@@ -710,7 +721,7 @@ function focusPlace(place){
     const b=place.boundingbox.map(Number);
     map.fitBounds([[b[2],b[0]],[b[3],b[1]]],{padding:90,maxZoom:12,duration:1300});
   }else map.flyTo({center:[lon,lat],zoom:9});
-  const match=findCountry(place);if(match&&(place.addresstype==='country'||place.type==='administrative'&&place.addresstype==='country'||place.class==='boundary'&&place.type==='administrative'&&place.address?.country===place.name))showCountry(match,{lat,lng:lon});else{showInfo(place.name||place.display_name.split(',')[0],place.display_name,{lat,lng:lon},t('location'));if(match){chosenCountry=match;sayCat(countryFact(match),'explore');addFactReplayButton(match);}}
+  const match=findCountry(place);if(match&&(place.addresstype==='country'||place.type==='administrative'&&place.addresstype==='country'||place.class==='boundary'&&place.type==='administrative'&&place.address?.country===place.name))showCountry(match,{lat,lng:lon});else{showInfo(place.name||place.display_name.split(',')[0],place.display_name,{lat,lng:lon},t('location'));if(match){chosenCountry=match;addCountryPopulation(match);sayCat(countryFact(match),'explore');addFactReplayButton(match);}}
   showSpecial(place.display_name||place.name||'');
   closeSearchResults();setStatus('');
 }
@@ -744,6 +755,7 @@ function focusPlate(code){
   map.fitBounds([[lo,bottom],[hi,top]],{padding:90,maxZoom:10,duration:1100});
   const name=f.properties?.il_adi||f.properties?.name||String(code);
   showInfo(name,`${lang==='tr'?'Plaka kodu':'Plate code'}: ${String(code).padStart(2,'0')}`,{lat:(bottom+top)/2,lng:(lo+hi)/2},t('province'));
+  addCountryPopulation(countries.find(c=>c.cca2==='TR'));
   showSpecial(name);
   closeSearchResults();setStatus('');
 }
